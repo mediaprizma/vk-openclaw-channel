@@ -1,0 +1,14 @@
+VK Channel for OpenClaw
+
+Copyright 2026 Dmitry Nikolaev / mediaprizma.
+
+This project is distributed under the Apache License, Version 2.0.
+
+The repository contains modified code derived from the Apache-2.0 licensed
+OpenClaw VK channel implementation originally published by Pavel Frankov.
+The original license terms are retained in LICENSE. This project is an
+independent continuation and is not an official project of the original
+author.
+
+Repository:
+https://github.com/mediaprizma/vk-openclaw-channel
