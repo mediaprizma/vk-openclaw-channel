@@ -50,6 +50,10 @@ function buildVideoUrl(ownerId: number, videoId: number): string {
   return `https://vk.com/video${ownerId}_${videoId}`;
 }
 
+function buildClipUrl(ownerId: number, videoId: number): string {
+  return `https://vk.com/clip${ownerId}_${videoId}`;
+}
+
 function normalizePostAttachments(raw: unknown): VkInboundAttachment[] {
   return extractVkInboundAttachments(raw);
 }
@@ -174,7 +178,7 @@ export async function resolveVkVideoComment(
     type: sourceType,
     ownerId,
     id: videoId,
-    url: buildVideoUrl(ownerId, videoId),
+    url: sourceType === "clip" ? buildClipUrl(ownerId, videoId) : buildVideoUrl(ownerId, videoId),
     text: readString(video?.description) ?? readString(video?.title),
     media,
     title: readString(video?.title),
