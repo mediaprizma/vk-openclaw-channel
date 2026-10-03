@@ -81,3 +81,6 @@ npm run check:runtime
 Проект распространяется по Apache License 2.0. См. `LICENSE` и `NOTICE`.
 
 Часть текущей кодовой базы происходит из ранее опубликованной Apache-2.0 реализации VK-канала OpenClaw и была перенесена сюда для дальнейшей самостоятельной разработки. Новые изменения должны оформляться как изменения этого проекта.
+
+
+CI verification branch: validates the current VK comment/session routing implementation.
