@@ -222,40 +222,48 @@ class BotsLongPollTransport {
 class UserLongPollTransport extends PollingTransport {
   private firstSuccessfulPoll: Promise<void>;
   private resolveFirstSuccessfulPoll!: () => void;
+  private rejectFirstSuccessfulPoll!: (error: Error) => void;
   private readinessSettled = false;
 
   constructor(params: ConstructorParameters<typeof PollingTransport>[0]) {
     super(params);
-    this.firstSuccessfulPoll = new Promise<void>((resolve) => {
+    this.firstSuccessfulPoll = new Promise<void>((resolve, reject) => {
       this.resolveFirstSuccessfulPoll = resolve;
+      this.rejectFirstSuccessfulPoll = reject;
     });
+    void this.firstSuccessfulPoll.catch(() => {});
   }
 
-  private settleReadiness(): void {
+  private settleReadinessSuccess(): void {
     if (this.readinessSettled) return;
     this.readinessSettled = true;
     this.resolveFirstSuccessfulPoll();
   }
 
+  private settleReadinessFailure(error: Error): void {
+    if (this.readinessSettled) return;
+    this.readinessSettled = true;
+    this.rejectFirstSuccessfulPoll(error);
+  }
+
   override async fetchUpdates(): Promise<void> {
     await super.fetchUpdates();
-    this.settleReadiness();
+    this.settleReadinessSuccess();
   }
 
   waitForFirstSuccessfulPoll(timeoutMs = FIRST_LONG_POLL_CHECK_TIMEOUT_MS): Promise<void> {
-    const timeout = setTimeout(() => {
-      if (!this.readinessSettled) {
-        this.readinessSettled = true;
-      }
-    }, timeoutMs);
+    const timeout = setTimeout(
+      () => this.settleReadinessFailure(new Error(FIRST_LONG_POLL_CHECK_ERROR)),
+      timeoutMs,
+    );
     return this.firstSuccessfulPoll.finally(() => clearTimeout(timeout));
   }
 
   async stopAndDrain(): Promise<void> {
     await this.stop();
+    this.settleReadinessFailure(new Error("VK User Long Poll stopped"));
   }
 }
-
 export type VkMonitorOptions = {
   token: string;
   accountId: string;
