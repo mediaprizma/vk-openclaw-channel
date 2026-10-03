@@ -134,49 +134,87 @@ function extractVkPublicMeta(html: string, key: "og:description" | "og:title"): 
   return undefined;
 }
 
-async function fetchVkPublicWallPost(postUrl: string): Promise<{
+async function fetchVkPublicWallPost(postUrl: string, logError?: (line: string) => void): Promise<{
   media: VkInboundAttachment[];
   text?: string;
 }> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
+  const timeout = setTimeout(() => controller.abort(), 15_000);
 
   try {
-    const response = await fetch(postUrl, {
-      method: "GET",
-      headers: {
-        accept: "text/html,application/xhtml+xml",
-        "accept-language": "ru-RU,ru;q=0.9,en;q=0.8",
-        "user-agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
-          "(KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
-      },
-      redirect: "follow",
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`VK public page returned HTTP ${response.status}`);
+    const urls = [postUrl];
+    try {
+      const parsed = new URL(postUrl);
+      if (parsed.hostname === "vk.com") {
+        parsed.hostname = "vk.ru";
+        urls.push(parsed.toString());
+      }
+    } catch {
+      // Keep the original URL as the only candidate.
     }
 
-    const html = await response.text();
-    if (html.length > 8_000_000) {
-      throw new Error("VK public page is unexpectedly large");
+    let lastError: unknown;
+    for (const url of urls) {
+      try {
+        logError?.(`vk: fetching public post page ${url}`);
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            accept: "text/html,application/xhtml+xml",
+            "accept-language": "ru-RU,ru;q=0.9,en;q=0.8",
+            "cache-control": "no-cache",
+            pragma: "no-cache",
+            "user-agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+              "(KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+          },
+          redirect: "follow",
+          signal: controller.signal,
+        });
+
+        const html = await response.text();
+        logError?.(
+          `vk: public post response status=${response.status} finalUrl=${response.url} htmlBytes=${Buffer.byteLength(html, "utf8")} contentType=${response.headers.get("content-type") ?? "unknown"}`,
+        );
+
+        if (!response.ok) {
+          throw new Error(`VK public page returned HTTP ${response.status}`);
+        }
+        if (html.length > 8_000_000) {
+          throw new Error("VK public page is unexpectedly large");
+        }
+
+        const imageUrls = collectVkPublicImageUrls(html);
+        logError?.(
+          `vk: public post parsed images=${imageUrls.length} pvPhoto=${(html.match(/pv_photo_image/g) ?? []).length} vkUserPhoto=${(html.match(/vkuserphoto\.ru/gi) ?? []).length}`,
+        );
+
+        const media = imageUrls.map((imageUrl, index) => ({
+          type: "photo",
+          kind: "image",
+          url: imageUrl,
+          mimeType: "image/jpeg",
+          title: `VK wall photo ${index + 1}`,
+          fromPost: true,
+        }));
+
+        if (media.length > 0 || extractVkPublicMeta(html, "og:description")) {
+          return {
+            media,
+            text: extractVkPublicMeta(html, "og:description"),
+          };
+        }
+
+        lastError = new Error("VK public page contained no extractable post media");
+      } catch (err) {
+        lastError = err;
+        logError?.(`vk: public post fetch failed for ${url}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
-    const media = collectVkPublicImageUrls(html).map((url, index) => ({
-      type: "photo",
-      kind: "image",
-      url,
-      mimeType: "image/jpeg",
-      title: `VK wall photo ${index + 1}`,
-      fromPost: true,
-    }));
-
-    return {
-      media,
-      text: extractVkPublicMeta(html, "og:description"),
-    };
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("VK public post could not be resolved");
   } finally {
     clearTimeout(timeout);
   }
@@ -221,8 +259,15 @@ export async function resolveVkWallComment(
   let publicPost: Awaited<ReturnType<typeof fetchVkPublicWallPost>> | undefined;
   if (!post) {
     try {
-      publicPost = await fetchVkPublicWallPost(postUrl);
-    } catch {
+      publicPost = await fetchVkPublicWallPost(postUrl, (line) => {
+        // Keep diagnostics on the channel logger path; the caller can inspect
+        // the exact public-page failure instead of silently losing post media.
+        console.warn(line);
+      });
+    } catch (err) {
+      console.warn(
+        `vk: source post resolution failed for ${postUrl}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       publicPost = undefined;
     }
   }
