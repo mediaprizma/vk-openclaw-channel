@@ -275,7 +275,12 @@ function commentMessageFromContext(
     isGroup: false,
     comment,
     replyRoute: {
-      type: comment.eventType === "post_comment" ? "post_comment" : "clip_comment",
+      type:
+        comment.eventType === "post_comment"
+          ? "post_comment"
+          : comment.eventType === "clip_comment"
+            ? "clip_comment"
+            : "video_comment",
       ownerId: comment.ownerId,
       contentId,
       commentId: comment.commentId,
