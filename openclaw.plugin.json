@@ -15,6 +15,26 @@
     "vk-openclaw-channel": {
       "label": "VK",
       "description": "Канал OpenClaw для сообществ ВКонтакте через Bots Long Poll API.",
+      "uiHints": {
+        "systemPrompt": {
+          "label": "System prompt",
+          "help": "Trusted instructions injected into every VK turn.",
+          "placeholder": "Instructions for the VK agent…",
+          "advanced": false
+        },
+        "accounts.*.systemPrompt": {
+          "label": "Account system prompt",
+          "help": "Trusted instructions for this VK account.",
+          "placeholder": "Instructions for this VK account…",
+          "advanced": false
+        },
+        "groups.*.systemPrompt": {
+          "label": "Group system prompt",
+          "help": "Additional trusted instructions for this VK group.",
+          "placeholder": "Instructions for this VK group…",
+          "advanced": true
+        }
+      },
       "schema": {
         "type": "object",
         "additionalProperties": true,
