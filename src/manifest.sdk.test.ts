@@ -61,6 +61,16 @@ describe.skipIf(!Ajv)("openclaw.plugin.json channel config schema", () => {
     expect(validate({ diagnostics: { level: "redacted", extra: true } })).toBe(false);
   });
 
+  it("accepts systemPrompt at channel and account levels", () => {
+    expect(validate({ token: "tok", systemPrompt: "Answer as a VK assistant." })).toBe(true);
+    expect(
+      validate({
+        token: "tok",
+        accounts: { work: { token: "tok", systemPrompt: "Account-specific instructions." } },
+      }),
+    ).toBe(true);
+  });
+
   it("accepts contextVisibility at channel level and under an account", () => {
     expect(validate({ token: "tok", contextVisibility: "allowlist" })).toBe(true);
     expect(
