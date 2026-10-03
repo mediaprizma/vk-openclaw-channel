@@ -1,7 +1,7 @@
 {
-  "id": "vk",
+  "id": "vk-openclaw-channel",
   "channels": [
-    "vk"
+    "vk-openclaw-channel"
   ],
   "doctorContract": {
     "stateMigrations": []
@@ -12,7 +12,7 @@
     "properties": {}
   },
   "channelConfigs": {
-    "vk": {
+    "vk-openclaw-channel": {
       "label": "VK",
       "description": "Канал OpenClaw для сообществ ВКонтакте через Bots Long Poll API.",
       "schema": {
@@ -149,7 +149,7 @@
           },
           "audio": {
             "type": "object",
-            "description": "Channel-wide voice limits; `settings.ts` reads `channels.vk.audio` for every account, so they are not accepted per account. `openclaw config validate` reads this schema, so the limits are typed here as well as in the zod schema.",
+            "description": "Channel-wide voice limits; `settings.ts` reads `channels.vk-openclaw-channel.audio` for every account, so they are not accepted per account. `openclaw config validate` reads this schema, so the limits are typed here as well as in the zod schema.",
             "additionalProperties": false,
             "properties": {
               "maxVoiceMs": {
