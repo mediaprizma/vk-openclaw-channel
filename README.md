@@ -54,7 +54,7 @@
 Для опубликованного npm-пакета:
 
 ```bash
-openclaw plugins install <имя-пакета> --force --accept-capabilities
+openclaw plugins install vk-openclaw-channel --force --accept-capabilities
 ```
 
 Для локальной разработки:
