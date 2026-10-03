@@ -11,7 +11,7 @@ export type StreamingCompatEntry = {
 };
 
 /**
- * Draft rendering mode accepted by `channels.vk.streaming.mode`.
+ * Draft rendering mode accepted by `channels.vk-openclaw-channel.streaming.mode`.
  *
  * Re-exported from the core rather than restated: the literals were written out
  * here, in the config schema and in the core, and a mode added upstream would
