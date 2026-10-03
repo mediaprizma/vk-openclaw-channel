@@ -207,7 +207,7 @@ function getOrCreateVkState(token: string): VkClientState {
   return state;
 }
 
-function getOrCreateVk(token: string): VK {
+export function getOrCreateVk(token: string): VK {
   return getOrCreateVkState(token).vk;
 }
 
