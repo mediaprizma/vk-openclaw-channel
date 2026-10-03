@@ -69,7 +69,7 @@ import type {
   VkInboundMessage,
 } from "./types.js";
 
-const CHANNEL_ID = "vk" as const;
+const CHANNEL_ID = "vk-openclaw-channel" as const;
 
 // VK group chats have peerId >= 2000000000
 const VK_GROUP_CHAT_OFFSET = 2_000_000_000;
@@ -220,7 +220,7 @@ export async function handleVkInbound(params: {
   const { groupPolicy, providerMissingFallbackApplied } = groupAccess;
   warnMissingProviderGroupPolicyFallbackOnce({
     providerMissingFallbackApplied,
-    providerKey: "vk",
+    providerKey: "vk-openclaw-channel",
     accountId: account.accountId,
     blockedLabel: GROUP_POLICY_BLOCKED_LABEL.channel,
     log: (msg) => runtime.log?.(msg),
@@ -630,7 +630,7 @@ export async function handleVkInbound(params: {
   const removeAckAfterReply =
     (cfgRecord.messages?.removeAckAfterReply as boolean | undefined) ?? false;
 
-  // ── Step-progress draft (opt-in via channels.vk.streaming.mode:"progress") ──
+  // ── Step-progress draft (opt-in via channels.vk-openclaw-channel.streaming.mode:"progress") ──
   // Shows the live list of execution steps (🛠️ tool calls, 🔎 web search …) in
   // ONE message edited in place, mirroring Telegram's "progress" stream. It is
   // INDEPENDENT of status reactions — both can run together (as Telegram does):
