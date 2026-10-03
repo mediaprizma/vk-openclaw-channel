@@ -19,6 +19,7 @@ function mergeVkAccountConfig(cfg: CoreConfig, accountId: string): VkAccountConf
     groupPolicy: vkConfig.groupPolicy,
     groupAllowFrom: vkConfig.groupAllowFrom,
     systemPrompt: vkConfig.systemPrompt,
+    commentPromptTemplate: vkConfig.commentPromptTemplate,
     transport: vkConfig.transport,
     contextVisibility: vkConfig.contextVisibility,
     groups: vkConfig.groups,
