@@ -113,7 +113,7 @@ export function applyVkAllowlistConfigEdit(params: {
   }
 
   const channels = (params.parsedConfig.channels ??= {}) as Record<string, unknown>;
-  const vk = ((channels.vk-openclaw-channel ??= {}) as Record<string, unknown>);
+  const vk = ((channels["vk-openclaw-channel"] ??= {}) as Record<string, unknown>);
   const normalizedAccountId =
     typeof params.accountId === "string" && params.accountId.trim()
       ? params.accountId.trim()
