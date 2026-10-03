@@ -57,7 +57,7 @@ const meta = {
   label: "VK",
   selectionLabel: "VK (VKontakte Bot)",
   detailLabel: "VK Bot",
-  docsPath: "/channels/vk-openclaw-channel-openclaw-channel",
+  docsPath: "/channels/vk-openclaw-channel",
   docsLabel: "vk-openclaw-channel",
   blurb: "VK (VKontakte) community bot via Long Poll API.",
   systemImage: "message.fill",
@@ -84,7 +84,7 @@ const VK_CHANNEL_KEY = "vk-openclaw-channel";
 const VK_DM_APPROVE_HINT = "openclaw pairing approve vk <code>";
 const VK_OPEN_GROUP_WARNING =
   '- VK group chats: groupPolicy="open" allows any member in group chats to trigger. ' +
-  'Set channels.vk-openclaw-channel-openclaw-channel.groupPolicy="allowlist" + channels.vk-openclaw-channel-openclaw-channel.groupAllowFrom to restrict senders.';
+  'Set channels.vk-openclaw-channel.groupPolicy="allowlist" + channels.vk-openclaw-channel.groupAllowFrom to restrict senders.';
 
 function normalizeVkDmAllowEntry(raw: string): string {
   return raw.replace(/^vk:(?:user:)?/i, "");
@@ -225,7 +225,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
     nativeCommands: false,
     blockStreaming: true,
   },
-  reload: { configPrefixes: ["channels.vk-openclaw-channel-openclaw-channel"] },
+  reload: { configPrefixes: ["channels.vk-openclaw-channel"] },
   configSchema: buildChannelConfigSchema(VkConfigSchema),
   secrets: {
     secretTargetRegistryEntries,
