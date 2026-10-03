@@ -56,8 +56,6 @@ function resolveTransportSilenceMs(config: VkAccountConfig): number {
 
 class ReadinessPollingTransport extends PollingTransport {
   private readinessSettled = false;
-  private firstFetchController: AbortController | undefined;
-  private activeFetch: Promise<void> | undefined;
   private readonly firstSuccessfulPoll: Promise<void>;
   private resolveFirstSuccessfulPoll!: () => void;
   private rejectFirstSuccessfulPoll!: (error: Error) => void;
@@ -73,144 +71,46 @@ class ReadinessPollingTransport extends PollingTransport {
       this.resolveFirstSuccessfulPoll = resolve;
       this.rejectFirstSuccessfulPoll = reject;
     });
-    // The observer is attached after transport bootstrap succeeds. Keep an
-    // immediate failed poll from becoming an unhandled rejection meanwhile.
     void this.firstSuccessfulPoll.catch(() => {});
   }
 
   waitForFirstSuccessfulPoll(timeoutMs = FIRST_LONG_POLL_CHECK_TIMEOUT_MS): Promise<void> {
     const timeout = setTimeout(() => {
       this.settleReadinessFailure();
-      this.firstFetchController?.abort();
     }, timeoutMs);
     return this.firstSuccessfulPoll.finally(() => clearTimeout(timeout));
   }
 
   private settleReadinessSuccess(): void {
-    if (this.readinessSettled) {
-      return;
-    }
+    if (this.readinessSettled) return;
     this.readinessSettled = true;
     this.resolveFirstSuccessfulPoll();
   }
 
-  private settleReadinessFailure(): void {
-    if (this.readinessSettled) {
-      return;
-    }
+  private settleReadinessFailure(error = new Error(FIRST_LONG_POLL_CHECK_ERROR)): void {
+    if (this.readinessSettled) return;
     this.readinessSettled = true;
-    this.rejectFirstSuccessfulPoll(new Error(FIRST_LONG_POLL_CHECK_ERROR));
-  }
-
-  private async fetchReadinessPoll(): Promise<void> {
-    const controller = new AbortController();
-    this.firstFetchController = controller;
-    this.url.searchParams.set("ts", String(this.ts));
-    this.url.searchParams.set("wait", "1");
-    try {
-      const response = await fetch(new URL(this.url), {
-        method: "GET",
-        signal: controller.signal,
-        headers: { connection: "keep-alive" },
-      });
-      if (!response.ok) {
-        throw new Error(FIRST_LONG_POLL_CHECK_ERROR);
-      }
-
-      const result: unknown = await response.json();
-      if (!result || typeof result !== "object") {
-        throw new Error(FIRST_LONG_POLL_CHECK_ERROR);
-      }
-
-      if ("failed" in result) {
-        if (
-          result.failed === 1
-          && (typeof result.ts === "string" || typeof result.ts === "number")
-        ) {
-          this.ts = result.ts;
-          return;
-        }
-        throw new Error(FIRST_LONG_POLL_CHECK_ERROR);
-      }
-
-      if (
-        !("updates" in result)
-        || !Array.isArray(result.updates)
-        || !("ts" in result)
-        || (typeof result.ts !== "string" && typeof result.ts !== "number")
-      ) {
-        throw new Error(FIRST_LONG_POLL_CHECK_ERROR);
-      }
-
-      this.restarted = 0;
-      this.ts = result.ts;
-      if ("pts" in result && (typeof result.pts === "string" || typeof result.pts === "number")) {
-        this.pts = Number(result.pts);
-      }
-      for (const update of result.updates) {
-        this.pollingHandler(update as unknown[]);
-      }
-    } catch {
-      // Fetch errors can include the Long Poll URL/key. Never surface them.
-      throw new Error(FIRST_LONG_POLL_CHECK_ERROR);
-    } finally {
-      // Only the readiness check is shortened. Normal vk-io polling retains
-      // its standard 25-second server wait after the first successful check.
-      this.url.searchParams.set("wait", "25");
-      if (this.firstFetchController === controller) {
-        this.firstFetchController = undefined;
-      }
-    }
+    this.rejectFirstSuccessfulPoll(error);
   }
 
   override async fetchUpdates(): Promise<void> {
-    const isReadinessPoll = !this.readinessSettled;
-    const activeFetch = isReadinessPoll ? this.fetchReadinessPoll() : super.fetchUpdates();
-    this.activeFetch = activeFetch;
     try {
-      await activeFetch;
+      await super.fetchUpdates();
+      this.settleReadinessSuccess();
       this.onSuccessfulPoll();
-    } finally {
-      if (this.activeFetch === activeFetch) {
-        this.activeFetch = undefined;
+    } catch (error) {
+      if (!this.readinessSettled) {
+        this.settleReadinessFailure(
+          error instanceof Error ? error : new Error(FIRST_LONG_POLL_CHECK_ERROR),
+        );
       }
+      throw error;
     }
   }
 
   override async stop(): Promise<void> {
     this.settleReadinessFailure();
-    this.firstFetchController?.abort();
     await super.stop();
-  }
-
-  async stopAndDrain(): Promise<void> {
-    const readinessFetch = this.readinessSettled ? undefined : this.activeFetch;
-    await this.stop();
-    // Drain only the abortable readiness request. After ready, preserve
-    // vk-io's normal immediate stop semantics for its 25-second poll.
-    await readinessFetch?.catch(() => {});
-  }
-
-  protected override async startFetchLoop(): Promise<void> {
-    // vk-io recursively invokes this method after post-ready transport errors.
-    // Only the initial invocation is a readiness probe; subsequent invocations
-    // must retain vk-io's normal retry/restart behavior.
-    if (this.readinessSettled) {
-      await super.startFetchLoop();
-      return;
-    }
-
-    try {
-      await this.fetchUpdates();
-      this.settleReadinessSuccess();
-    } catch {
-      this.settleReadinessFailure();
-      return;
-    }
-
-    if (this.started) {
-      await super.startFetchLoop();
-    }
   }
 }
 
