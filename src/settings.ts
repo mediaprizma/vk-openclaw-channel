@@ -2,7 +2,7 @@ import { parseStrictPositiveInteger } from "openclaw/plugin-sdk/core";
 import { readVkRuntimeConfig, tryGetVkRuntime } from "./runtime.js";
 
 /**
- * Channel tunables, read from `channels.vk.*` with an environment override.
+ * Channel tunables, read from `channels.vk-openclaw-channel.*` with an environment override.
  *
  * These used to live in the environment only. That put roughly a dozen
  * user-facing settings outside everything the host provides for configuration —
