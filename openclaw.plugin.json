@@ -170,6 +170,10 @@
               "allowlist_quote"
             ]
           },
+          "systemPrompt": {
+            "type": "string",
+            "description": "Trusted system prompt injected into every VK turn. This is available channel-wide and can be overridden per account."
+          },
           "audio": {
             "type": "object",
             "description": "Channel-wide voice limits; `settings.ts` reads `channels.vk-openclaw-channel.audio` for every account, so they are not accepted per account. `openclaw config validate` reads this schema, so the limits are typed here as well as in the zod schema.",
@@ -365,7 +369,11 @@
               "videoComments": { "type": "boolean" }
             }
           },
-"contextVisibility": {
+"systemPrompt": {
+                  "type": "string",
+                  "description": "Additional trusted system prompt for this VK account."
+                },
+                "contextVisibility": {
                   "type": "string",
                   "description": "Overrides the channel-wide contextVisibility for this account.",
                   "enum": [
