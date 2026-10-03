@@ -265,7 +265,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
       },
       "accounts.*.systemPrompt": {
         label: "Account system prompt",
-        help: "Trusted instructions for this VK account. Group-specific instructions are appended after it.",
+        help: "System prompt for this VK account. It overrides the channel-wide prompt; group-specific instructions are appended after it.",
         placeholder: "Instructions for this VK account…",
         advanced: false,
       },
