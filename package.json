@@ -1,0 +1,138 @@
+{
+  "name": "@openclaw-vk/vk",
+  "version": "2026.9.10",
+  "description": "OpenClaw VK (VKontakte) channel plugin",
+  "author": {
+    "name": "Pavel Frankov",
+    "url": "https://github.com/pfrankov"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "openclaw-channel",
+    "vk",
+    "vkontakte",
+    "vk-bot",
+    "bot"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pfrankov/openclaw-vk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pfrankov/openclaw-vk/issues"
+  },
+  "homepage": "https://github.com/pfrankov/openclaw-vk#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "api.ts",
+    "doctor-contract-api.ts",
+    "secret-contract-api.ts",
+    "index.ts",
+    "setup-entry.ts",
+    "openclaw.plugin.json",
+    "src/accounts.ts",
+    "src/channel.setup.ts",
+    "src/channel.ts",
+    "src/config-schema.ts",
+    "src/audio-chunk.ts",
+    "src/vk-errors.ts",
+    "src/settings.ts",
+    "src/diagnostics.ts",
+    "src/stall-watchdog.ts",
+    "src/format.ts",
+    "src/group-access.ts",
+    "src/inbound.ts",
+    "src/keyboard.ts",
+    "src/media.ts",
+    "src/monitor.ts",
+    "src/probe.ts",
+    "src/progress-draft.ts",
+    "src/question.ts",
+    "src/question-events.ts",
+    "src/reactions-controller.ts",
+    "src/runtime.ts",
+    "src/sanitize.ts",
+    "src/sdk-compat.ts",
+    "src/secret-contract.ts",
+    "src/send-support.ts",
+    "src/send.ts",
+    "src/setup-core.ts",
+    "src/setup-surface.ts",
+    "src/types.ts"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "npm run check:sdk-imports && npm run test:coverage && npm run build && npm run check:pack",
+    "check:pack": "npm pack --dry-run",
+    "check:runtime": "node scripts/smoke-runtime.mjs",
+    "check:sdk-imports": "node scripts/check-sdk-imports.mjs",
+    "prepack": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:sdk": "vitest run src/diagnostics.sdk.test.ts src/manifest.sdk.test.ts src/inbound.draft.sdk.test.ts src/inbound.ack.sdk.test.ts src/question.stand.sdk.test.ts src/group-access.sdk.test.ts src/secret-contract.sdk.test.ts"
+  },
+  "dependencies": {
+    "markdown-to-vk": "^0.3.2",
+    "vk-io": "^4.10.1",
+    "zod": "^3.25.76"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.8.1-0"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "bundleDependencies": [
+    "vk-io"
+  ],
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.7",
+    "esbuild": "^0.28.2",
+    "vitest": "^3.2.7"
+  },
+  "openclaw": {
+    "compat": {
+      "pluginApi": ">=2026.8.1-0",
+      "minGatewayVersion": "2026.8.1"
+    },
+    "build": {
+      "openclawVersion": "2026.8.1",
+      "pluginSdkVersion": "2026.8.1"
+    },
+    "extensions": [
+      "./index.ts"
+    ],
+    "runtimeExtensions": [
+      "./dist/index.js"
+    ],
+    "setupEntry": "./setup-entry.ts",
+    "runtimeSetupEntry": "./dist/setup-entry.js",
+    "channel": {
+      "id": "vk",
+      "label": "VK",
+      "selectionLabel": "VK (VKontakte Bot)",
+      "docsPath": "/channels/vk",
+      "docsLabel": "vk",
+      "blurb": "VK (VKontakte) community bot via Long Poll API.",
+      "order": 80,
+      "quickstartAllowFrom": true
+    },
+    "install": {
+      "npmSpec": "@openclaw-vk/vk",
+      "localPath": "extensions/vk",
+      "defaultChoice": "npm"
+    }
+  }
+}
