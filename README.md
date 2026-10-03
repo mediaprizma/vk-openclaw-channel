@@ -87,7 +87,7 @@ openclaw gateway restart
 ```json
 {
   "channels": {
-    "vk": {
+    "vk-openclaw-channel": {
       "enabled": true,
       "token": "<VK_COMMUNITY_TOKEN>",
       "dmPolicy": "pairing"
@@ -110,7 +110,7 @@ openclaw gateway restart
 ```json
 {
   "channels": {
-    "vk": {
+    "vk-openclaw-channel": {
       "enabled": true,
       "token": "<VK_COMMUNITY_TOKEN>",
       "dmPolicy": "allowlist",
@@ -129,7 +129,7 @@ openclaw gateway restart
 ```json
 {
   "channels": {
-    "vk": {
+    "vk-openclaw-channel": {
       "groups": {
         "2000000123": {
           "enabled": true,
@@ -150,7 +150,7 @@ openclaw gateway restart
 ```json
 {
   "channels": {
-    "vk": {
+    "vk-openclaw-channel": {
       "accounts": {
         "sales": {
           "enabled": true,
@@ -183,7 +183,7 @@ openclaw gateway restart
 ```json
 {
   "channels": {
-    "vk": {
+    "vk-openclaw-channel": {
       "token": {
         "source": "env",
         "provider": "default",
