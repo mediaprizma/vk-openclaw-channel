@@ -535,7 +535,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
     },
     logoutAccount: async ({ accountId, cfg }) => {
       const nextCfg = { ...cfg } as OpenClawConfig;
-      const vkConfig = ((cfg.channels as Record<string, unknown>)?.vk ?? {}) as VkConfig;
+      const vkConfig = ((cfg.channels as Record<string, unknown>)?.["vk-openclaw-channel"] ?? {}) as VkConfig;
       const nextVk = { ...vkConfig };
       let cleared = false;
       let changed = false;
