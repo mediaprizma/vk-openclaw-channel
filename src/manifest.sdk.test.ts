@@ -71,6 +71,16 @@ describe.skipIf(!Ajv)("openclaw.plugin.json channel config schema", () => {
     ).toBe(true);
   });
 
+  it("accepts commentPromptTemplate at channel and account levels", () => {
+    expect(validate({ token: "tok", commentPromptTemplate: "{{comment_text}}" })).toBe(true);
+    expect(
+      validate({
+        token: "tok",
+        accounts: { work: { token: "tok", commentPromptTemplate: "{{origin_url}}" } },
+      }),
+    ).toBe(true);
+  });
+
   it("accepts contextVisibility at channel level and under an account", () => {
     expect(validate({ token: "tok", contextVisibility: "allowlist" })).toBe(true);
     expect(
