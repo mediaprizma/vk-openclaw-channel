@@ -3,16 +3,9 @@ import { formatVkCommentContext, isVkCommentEventType, resolveVkVideoComment, re
 import { buildVkCommentTarget, parseVkCommentTarget } from "./types.js";
 import type { VkInboundComment } from "./types.js";
 
-vi.mock("./media.js", () => ({
-  extractVkInboundAttachments: vi.fn((raw: unknown) =>
-    Array.isArray(raw) ? raw : [],
-  ),
-}));
-
 const mockVk = {
   api: {
     wall: {
-      getById: vi.fn(),
       createComment: vi.fn(),
     },
     video: {
@@ -61,14 +54,7 @@ describe("VK comments", () => {
     await expect(resolveVkWallComment(mockVk as never, { id: 1 })).resolves.toBeNull();
   });
 
-  it("resolves a wall comment with the source post and image media", async () => {
-    mockVk.api.wall.getById.mockResolvedValueOnce({
-      items: [{
-        post_type: "post",
-        text: "Новая татуировка",
-        attachments: [{ type: "photo", kind: "image", url: "https://example.test/tattoo.jpg", mimeType: "image/jpeg" }],
-      }],
-    });
+  it("resolves a wall comment with the source post link only", async () => {
     const result = await resolveVkWallComment(mockVk as never, {
       id: 42,
       owner_id: -100,
@@ -89,115 +75,9 @@ describe("VK comments", () => {
         type: "post",
         id: 777,
         url: "https://vk.com/wall-100_777",
-        text: "Новая татуировка",
+        media: [],
       },
     });
-    expect(result?.origin.media).toHaveLength(1);
-  });
-
-  it("loads source post image from the public VK page when wall.getById is unavailable", async () => {
-    mockVk.api.wall.getById.mockRejectedValueOnce(new Error("VK error 27"));
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      text: async () =>
-        '<div id="pv_photo"><img data-testid="pv_photo_image" src="https://sun9-48.vkuserphoto.ru/photo.jpg?quality=95&amp;crop=0,0,1961,1593"></div>',
-    }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await resolveVkWallComment(mockVk as never, {
-      id: 43,
-      owner_id: -80752341,
-      post_id: 512,
-      from_id: 123,
-      text: "такую хочу",
-      date: 1700000000,
-    });
-
-    expect(result?.origin.url).toBe("https://vk.com/wall-80752341_512");
-    expect(result?.origin.media).toEqual([
-      expect.objectContaining({
-        type: "photo",
-        kind: "image",
-        url: "https://sun9-48.vkuserphoto.ru/photo.jpg?quality=95&crop=0,0,1961,1593",
-        mimeType: "image/jpeg",
-        fromPost: true,
-      }),
-    ]);
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://vk.com/wall-80752341_512",
-      expect.objectContaining({
-        method: "GET",
-        redirect: "follow",
-      }),
-    );
-  });
-
-  it("extracts embedded VK source image URLs from the ordinary wall page", async () => {
-    mockVk.api.wall.getById.mockRejectedValueOnce(new Error("VK error 27"));
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      text: async () =>
-        '<div data-json="{&quot;photo&quot;:&quot;https:\/\/sun9-48.vkuserphoto.ru\/s\/v1\/ig2\/abc.jpg?quality=95&amp;crop=0,0,1961,1593&amp;as=32x26,1961x1593&quot;}">' +
-        '<img src="https://sun9-48.vkuserphoto.ru/avatar.jpg?size=73x73">',
-    }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await resolveVkWallComment(mockVk as never, {
-      id: 45,
-      owner_id: -80752341,
-      post_id: 515,
-      from_id: 123,
-      text: "что на фото?",
-      date: 1700000000,
-    });
-
-    expect(result?.origin.media).toEqual([
-      expect.objectContaining({
-        kind: "image",
-        url: "https://sun9-48.vkuserphoto.ru/s/v1/ig2/abc.jpg?quality=95&crop=0,0,1961,1593&as=32x26,1961x1593",
-        fromPost: true,
-      }),
-    ]);
-  });
-
-  it("uses the public page when the VK API returns a partial post without media", async () => {
-    mockVk.api.wall.getById.mockResolvedValueOnce({
-      items: [{ post_type: "post", text: "Пост без вложений в API", attachments: [] }],
-    });
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      text: async () =>
-        '<meta property="og:image" content="https://sun9-48.vkuserphoto.ru/s/v1/ig2/abc.jpg?crop=0,0,1200,900">',
-    })));
-
-    const result = await resolveVkWallComment(mockVk as never, {
-      id: 46,
-      owner_id: -80752341,
-      post_id: 515,
-      from_id: 123,
-      text: "покажи",
-      date: 1700000000,
-    });
-
-    expect(result?.origin.text).toBe("Пост без вложений в API");
-    expect(result?.origin.media).toHaveLength(1);
-    expect(result?.origin.media[0]?.url).toContain("/s/v1/ig2/abc.jpg");
-  });
-
-  it("falls back safely when both VK API and public page are unavailable", async () => {
-    mockVk.api.wall.getById.mockRejectedValueOnce(new Error("VK error 27"));
-    vi.stubGlobal("fetch", vi.fn(async () => {
-      throw new Error("network unavailable");
-    }));
-    const result = await resolveVkWallComment(mockVk as never, {
-      id: 44, owner_id: -100, post_id: 778, from_id: 123, text: "Цена?", date: 1700000000,
-    });
-    expect(result?.eventType).toBe("post_comment");
-    expect(result?.origin.text).toBeUndefined();
-    expect(result?.origin.media).toEqual([]);
   });
 
   it("resolves a short video comment as a Clip and chooses its largest preview", async () => {
@@ -255,13 +135,12 @@ describe("VK comments", () => {
         id: 777,
         url: "https://vk.com/wall-100_777",
         text: "Новая работа",
-        media: [{ type: "photo", kind: "image", url: "https://example.test/t.jpg", mimeType: "image/jpeg" }],
+        media: [],
       },
     } satisfies VkInboundComment;
     const text = formatVkCommentContext(comment);
     expect(text).toContain("ВКонтакте → комментарий к записи");
     expect(text).toContain("https://vk.com/wall-100_777");
-    expect(text).toContain("Медиа передано агенту отдельно");
     expect(text).toContain("предложи клиенту написать в личные сообщения");
   });
 
