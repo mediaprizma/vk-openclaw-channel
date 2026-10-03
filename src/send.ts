@@ -35,6 +35,7 @@ import {
 import { getVkRuntime, readVkRuntimeConfig } from "./runtime.js";
 import { vkPositiveSetting } from "./settings.js";
 import { isVkGroupPeerId, normalizeVkTargetId } from "./send-support.js";
+import { parseVkCommentTarget } from "./types.js";
 import type { CoreConfig, ResolvedVkAccount, VkReplyButtons } from "./types.js";
 export {
   applyVkAllowlistConfigEdit,
@@ -1936,6 +1937,56 @@ export async function deleteMessageVk(
   });
 }
 
+async function sendVkCommentText(
+  to: string,
+  text: string,
+  opts: SendVkOptions,
+): Promise<SendVkResult> {
+  const parsed = parseVkCommentTarget(to);
+  if (!parsed) throw new Error(`Invalid VK comment target: ${to}`);
+
+  const account = resolveVkAccount({
+    cfg: opts.cfg ?? readVkRuntimeConfig(getVkRuntime()),
+    accountId: opts.accountId,
+  });
+  if (!account.token) throw new Error(describeMissingVkToken(account));
+
+  const vk = getOrCreateVk(account.token);
+  const ownGroup = await resolveVkOwnGroup(account.token);
+  const common = {
+    message: text,
+    ...(ownGroup?.id !== undefined ? { from_group: ownGroup.id } : {}),
+  };
+
+  let messageId: number;
+  if (parsed.route.type === "post_comment") {
+    const response = await vk.api.wall.createComment({
+      owner_id: parsed.route.ownerId,
+      post_id: parsed.route.contentId,
+      ...common,
+      reply_to_comment: parsed.route.commentId,
+      guid: `openclaw-vk-comment-${parsed.route.commentId}-${Date.now()}`,
+    } as never);
+    messageId = Number((response as { comment_id?: unknown }).comment_id);
+  } else {
+    const response = await vk.api.video.createComment({
+      owner_id: parsed.route.ownerId,
+      video_id: parsed.route.contentId,
+      ...common,
+      reply_to_comment: parsed.route.commentId,
+      guid: `openclaw-vk-comment-${parsed.route.commentId}-${Date.now()}`,
+    } as never);
+    messageId = Number(response);
+  }
+
+  if (!Number.isFinite(messageId) || messageId <= 0) {
+    throw new Error(`VK comment reply returned an invalid message id for ${to}`);
+  }
+
+  recordOutboundActivity(account.accountId);
+  return { messageId: String(messageId), chatId: to };
+}
+
 async function sendMessageChunksVk(params: {
   to: string;
   chunks: VkPreparedFormattedMessage[];
@@ -1943,6 +1994,17 @@ async function sendMessageChunksVk(params: {
   /** Called after each delivered chunk, for callers that report partial delivery. */
   onSent?: (result: SendVkResult) => void;
 }): Promise<SendVkResult[]> {
+  if (parseVkCommentTarget(params.to)) {
+    const results: SendVkResult[] = [];
+    for (const chunk of params.chunks) {
+      if (!chunk?.text) continue;
+      const result = await sendVkCommentText(params.to, chunk.text, params.opts);
+      results.push(result);
+      params.onSent?.(result);
+    }
+    return results;
+  }
+
   const { account, peerId, to: normalizedTo } = await resolveSendTarget({
     cfg: params.opts.cfg,
     accountId: params.opts.accountId,
@@ -2142,6 +2204,12 @@ async function sendPayloadResultsVk(params: {
 }): Promise<SendVkResult[]> {
   if (!params.text && params.mediaRefs.length === 0) {
     return [];
+  }
+
+  if (parseVkCommentTarget(params.to) && params.mediaRefs.length > 0) {
+    throw new Error(
+      "VK public comment delivery currently supports text only; refusing to redirect media to the customer's private chat.",
+    );
   }
 
   if (params.mediaRefs.length > 0) {

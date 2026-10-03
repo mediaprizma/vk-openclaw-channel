@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatVkCommentContext, isVkCommentEventType, resolveVkVideoComment, resolveVkWallComment, sendVkCommentReply } from "./comments.js";
+import { buildVkCommentTarget, parseVkCommentTarget } from "./types.js";
 import type { VkInboundComment } from "./types.js";
 
 vi.mock("./media.js", () => ({
@@ -25,6 +26,25 @@ vi.mock("./send.js", () => ({
   getOrCreateVk: vi.fn(() => mockVk),
   resolveVkOwnGroup: vi.fn(async () => ({ id: 999 })),
 }));
+
+describe("VK comment routes", () => {
+  it("round-trips a public comment target without treating it as a VK peer id", () => {
+    const target = buildVkCommentTarget({
+      route: { type: "post_comment", ownerId: -80752341, contentId: 515, commentId: 539 },
+      senderId: 62517700,
+    });
+    expect(target).toBe("vk:comment:post_comment:-80752341:515:539:62517700");
+    expect(parseVkCommentTarget(target)).toEqual({
+      route: { type: "post_comment", ownerId: -80752341, contentId: 515, commentId: 539 },
+      senderId: 62517700,
+    });
+  });
+
+  it("rejects malformed public comment targets", () => {
+    expect(parseVkCommentTarget("vk:comment:post_comment:comment:539")).toBeUndefined();
+    expect(parseVkCommentTarget("vk:comment:post_comment:-80752341:515:0:62517700")).toBeUndefined();
+  });
+});
 
 describe("VK comments", () => {
   beforeEach(() => vi.clearAllMocks());
