@@ -16,7 +16,7 @@ const meta = {
   label: "VK",
   selectionLabel: "VK (VKontakte Bot)",
   detailLabel: "VK Bot",
-  docsPath: "/channels/vk-openclaw-channel-openclaw-channel-openclaw-channel",
+  docsPath: "/channels/vk-openclaw-channel-openclaw-channel",
   docsLabel: "vk-openclaw-channel",
   blurb: "VK (VKontakte) community bot via Long Poll API.",
   systemImage: "message.fill",
@@ -38,7 +38,7 @@ export const vkSetupPlugin: ChannelPlugin<ResolvedVkAccount> = {
     nativeCommands: false,
     blockStreaming: true,
   },
-  reload: { configPrefixes: ["channels.vk-openclaw-channel-openclaw-channel-openclaw-channel"] },
+  reload: { configPrefixes: ["channels.vk-openclaw-channel-openclaw-channel"] },
   configSchema: buildChannelConfigSchema(VkConfigSchema),
   config: {
     listAccountIds: (cfg: OpenClawConfig) => listVkAccountIds(cfg),
