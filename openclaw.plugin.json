@@ -354,7 +354,18 @@
                     }
                   ]
                 },
-                "contextVisibility": {
+                          "comments": {
+            "type": "object",
+            "description": "Per-account VK wall/video comment handling.",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "postComments": { "type": "boolean" },
+              "clipComments": { "type": "boolean" },
+              "videoComments": { "type": "boolean" }
+            }
+          },
+"contextVisibility": {
                   "type": "string",
                   "description": "Overrides the channel-wide contextVisibility for this account.",
                   "enum": [
