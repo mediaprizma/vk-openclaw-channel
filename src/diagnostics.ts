@@ -212,7 +212,7 @@ function isVkDiagLevel(value: unknown): value is VkDiagLevel {
  * fall through to whatever the config says, so a typo in the override can never
  * widen what is logged.
  *
- * Only `channels.vk-openclaw-channel.diagnostics` is read: the level is channel-wide, and the
+ * Only `channels.vk-openclaw-channel-openclaw-channel.diagnostics` is read: the level is channel-wide, and the
  * config schema accepts it at channel level only, so an account cannot ask for a
  * level it would not get.
  */
@@ -226,7 +226,7 @@ export function resolveVkDiagLevel(): VkDiagLevel {
     const channels = tryGetVkRuntime()?.config.current()?.channels as
       | { vk?: { diagnostics?: { level?: unknown } } }
       | undefined;
-    const fromConfig = channels?.vk?.diagnostics?.level;
+    const fromConfig = channels?.["vk-openclaw-channel"]?.diagnostics?.level;
     if (isVkDiagLevel(fromConfig)) {
       return fromConfig;
     }
