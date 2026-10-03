@@ -19,9 +19,9 @@ function requireOpenAllowFrom(params: {
 }
 
 const OPEN_DM_POLICY_ALLOW_FROM_ERROR =
-  'channels.vk-openclaw-channel.dmPolicy="open" requires channels.vk-openclaw-channel.allowFrom to include "*"';
+  'channels.vk-openclaw-channel-openclaw-channel.dmPolicy="open" requires channels.vk-openclaw-channel-openclaw-channel.allowFrom to include "*"';
 
-// Long-poll transport (`channels.vk-openclaw-channel.transport`).
+// Long-poll transport (`channels.vk-openclaw-channel-openclaw-channel.transport`).
 const VkTransportSchema = z
   .object({
     /**
@@ -54,7 +54,7 @@ const VkGroupConfigSchema = z
   .strict()
   .optional();
 
-// Channel diagnostics (`channels.vk-openclaw-channel.diagnostics`). A level rather than a
+// Channel diagnostics (`channels.vk-openclaw-channel-openclaw-channel.diagnostics`). A level rather than a
 // toggle: "off" is silent, "redacted" logs progress without file names or URLs,
 // "full" logs everything. Details and the table live in src/diagnostics.ts.
 const VkDiagnosticsSchema = z
@@ -65,7 +65,7 @@ const VkDiagnosticsSchema = z
   .strict()
   .optional();
 
-// Voice and media limits (`channels.vk-openclaw-channel.audio`). These were environment-only,
+// Voice and media limits (`channels.vk-openclaw-channel-openclaw-channel.audio`). These were environment-only,
 // which put a dozen user-facing settings outside schema validation, `doctor` and
 // live reload. The environment still overrides, as an escape hatch on a running
 // gateway.
@@ -87,7 +87,7 @@ const VkAudioSchema = z
   .strict()
   .optional();
 
-// Step-progress draft (`channels.vk-openclaw-channel.streaming`). Only the mode is typed here:
+// Step-progress draft (`channels.vk-openclaw-channel-openclaw-channel.streaming`). Only the mode is typed here:
 // the draft is rendered by the core compositor, which owns and validates every
 // key below it (`progress.label`, `progress.maxLines`, …). VK implements the
 // `progress` mode only, so the other core modes are not accepted — they would
@@ -155,9 +155,9 @@ export const VkAccountSchema = VkAccountSchemaBase.superRefine((value, ctx) => {
 export const VkConfigSchema = VkAccountSchemaBase.extend({
   // Channel-wide only: every account shares one level (see resolveVkDiagLevel).
   diagnostics: VkDiagnosticsSchema,
-  // Channel-wide only: settings.ts reads channels.vk-openclaw-channel.audio for every account.
+  // Channel-wide only: settings.ts reads channels.vk-openclaw-channel-openclaw-channel.audio for every account.
   audio: VkAudioSchema,
-  // Channel-wide only: inbound.ts reads channels.vk-openclaw-channel.streaming for every account.
+  // Channel-wide only: inbound.ts reads channels.vk-openclaw-channel-openclaw-channel.streaming for every account.
   streaming: VkStreamingSchema,
   accounts: z.record(z.string(), VkAccountSchema).optional(),
 }).superRefine((value, ctx) => {
