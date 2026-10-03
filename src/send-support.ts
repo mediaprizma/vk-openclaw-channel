@@ -103,8 +103,8 @@ export function applyVkAllowlistConfigEdit(params: {
       changed: boolean;
       pathLabel: string;
       writeTarget:
-        | { kind: "channel"; scope: { channelId: "vk" } }
-        | { kind: "account"; scope: { channelId: "vk"; accountId: string } };
+        | { kind: "channel"; scope: { channelId: "vk-openclaw-channel" } }
+        | { kind: "account"; scope: { channelId: "vk-openclaw-channel"; accountId: string } };
     }
   | { kind: "invalid-entry" } {
   const normalizedEntry = normalizeVkSenderAllowEntry(params.entry);
@@ -113,7 +113,7 @@ export function applyVkAllowlistConfigEdit(params: {
   }
 
   const channels = (params.parsedConfig.channels ??= {}) as Record<string, unknown>;
-  const vk = ((channels.vk ??= {}) as Record<string, unknown>);
+  const vk = ((channels.vk-openclaw-channel ??= {}) as Record<string, unknown>);
   const normalizedAccountId =
     typeof params.accountId === "string" && params.accountId.trim()
       ? params.accountId.trim()
@@ -167,11 +167,11 @@ export function applyVkAllowlistConfigEdit(params: {
     kind: "ok",
     changed,
     pathLabel: useAccount
-      ? `channels.vk.accounts.${normalizedAccountId}.${writePath}`
-      : `channels.vk.${writePath}`,
+      ? `channels.vk-openclaw-channel.accounts.${normalizedAccountId}.${writePath}`
+      : `channels.vk-openclaw-channel.${writePath}`,
     writeTarget: useAccount
-      ? { kind: "account", scope: { channelId: "vk", accountId: normalizedAccountId } }
-      : { kind: "channel", scope: { channelId: "vk" } },
+      ? { kind: "account", scope: { channelId: "vk-openclaw-channel", accountId: normalizedAccountId } }
+      : { kind: "channel", scope: { channelId: "vk-openclaw-channel" } },
   };
 }
 
