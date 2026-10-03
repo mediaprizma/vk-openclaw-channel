@@ -8,8 +8,8 @@ export { setVkRuntime } from "./src/runtime.js";
 
 export default defineChannelPluginEntry({
   id: "vk",
-  name: "VK",
-  description: "VK (VKontakte) community bot channel plugin",
+  name: "VK Channel",
+  description: "Канал OpenClaw для сообществ ВКонтакте.",
   plugin: vkPlugin as ChannelPlugin,
   setRuntime: setVkRuntime,
 });
