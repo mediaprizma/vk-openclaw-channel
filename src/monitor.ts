@@ -212,6 +212,50 @@ class BotsLongPollTransport {
   }
 }
 
+
+/**
+ * Adapts vk-io's User Long Poll transport to the lifecycle contract used by
+ * this monitor. PollingTransport exposes stop(), not stopAndDrain(), and its
+ * start() only launches the fetch loop, so readiness is tied to the first
+ * completed poll.
+ */
+class UserLongPollTransport extends PollingTransport {
+  private firstSuccessfulPoll: Promise<void>;
+  private resolveFirstSuccessfulPoll!: () => void;
+  private readinessSettled = false;
+
+  constructor(params: ConstructorParameters<typeof PollingTransport>[0]) {
+    super(params);
+    this.firstSuccessfulPoll = new Promise<void>((resolve) => {
+      this.resolveFirstSuccessfulPoll = resolve;
+    });
+  }
+
+  private settleReadiness(): void {
+    if (this.readinessSettled) return;
+    this.readinessSettled = true;
+    this.resolveFirstSuccessfulPoll();
+  }
+
+  override async fetchUpdates(): Promise<void> {
+    await super.fetchUpdates();
+    this.settleReadiness();
+  }
+
+  waitForFirstSuccessfulPoll(timeoutMs = FIRST_LONG_POLL_CHECK_TIMEOUT_MS): Promise<void> {
+    const timeout = setTimeout(() => {
+      if (!this.readinessSettled) {
+        this.readinessSettled = true;
+      }
+    }, timeoutMs);
+    return this.firstSuccessfulPoll.finally(() => clearTimeout(timeout));
+  }
+
+  async stopAndDrain(): Promise<void> {
+    await this.stop();
+  }
+}
+
 export type VkMonitorOptions = {
   token: string;
   accountId: string;
@@ -676,13 +720,13 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       opts.runtime.log?.(`[${opts.accountId}] using native VK Bots Long Poll fetch loop (group ${botsLp.groupId})`);
       await pollingTransport.start();
     } else {
-      const userPolling = new PollingTransport({
+      const userPolling = new UserLongPollTransport({
         api: vk.api,
         pollingWait: 3_000,
         pollingRetryLimit: 3,
       });
       userPolling.subscribe((update) => vk.updates.handlePollingUpdate(update));
-      pollingTransport = userPolling as typeof pollingTransport;
+      pollingTransport = userPolling;
       opts.runtime.log?.(
         `[${opts.accountId}] Bots Long Poll unavailable, falling back to User Long Poll`,
       );
