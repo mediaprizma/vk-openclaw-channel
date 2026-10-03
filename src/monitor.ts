@@ -16,7 +16,7 @@ import {
 } from "./media.js";
 import { getVkRuntime, readVkRuntimeConfig } from "./runtime.js";
 import { handleVkQuestionEvent } from "./question-events.js";
-import { primeVkGroupId } from "./send.js";
+import { primeVkGroupId, resolveVkOwnGroup } from "./send.js";
 import type { CoreConfig, VkAccountConfig, VkInboundMessage } from "./types.js";
 
 const FIRST_LONG_POLL_CHECK_TIMEOUT_MS = 35_000;
