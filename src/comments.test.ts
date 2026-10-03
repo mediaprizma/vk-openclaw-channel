@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatVkCommentContext, isVkCommentEventType, resolveVkVideoComment, resolveVkWallComment, sendVkCommentReply } from "./comments.js";
 import type { VkInboundComment } from "./types.js";
 
@@ -27,6 +27,9 @@ vi.mock("./send.js", () => ({
 }));
 
 describe("VK comments", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.unstubAllGlobals());
+
   it("recognizes all normalized comment event types", () => {
     expect(isVkCommentEventType("post_comment")).toBe(true);
     expect(isVkCommentEventType("clip_comment")).toBe(true);
@@ -72,10 +75,51 @@ describe("VK comments", () => {
     expect(result?.origin.media).toHaveLength(1);
   });
 
-  it("falls back safely when the source post cannot be loaded", async () => {
-    mockVk.api.wall.getById.mockRejectedValueOnce(new Error("VK unavailable"));
+  it("loads source post image from the public VK page when wall.getById is unavailable", async () => {
+    mockVk.api.wall.getById.mockRejectedValueOnce(new Error("VK error 27"));
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () =>
+        '<div id="pv_photo"><img data-testid="pv_photo_image" src="https://sun9-48.vkuserphoto.ru/photo.jpg?quality=95&amp;crop=0,0,1961,1593"></div>',
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
     const result = await resolveVkWallComment(mockVk as never, {
-      id: 43, owner_id: -100, post_id: 778, from_id: 123, text: "Цена?", date: 1700000000,
+      id: 43,
+      owner_id: -80752341,
+      post_id: 512,
+      from_id: 123,
+      text: "такую хочу",
+      date: 1700000000,
+    });
+
+    expect(result?.origin.url).toBe("https://vk.com/wall-80752341_512");
+    expect(result?.origin.media).toEqual([
+      expect.objectContaining({
+        type: "photo",
+        kind: "image",
+        url: "https://sun9-48.vkuserphoto.ru/photo.jpg?quality=95&crop=0,0,1961,1593",
+        mimeType: "image/jpeg",
+        fromPost: true,
+      }),
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://vk.com/wall-80752341_512",
+      expect.objectContaining({
+        method: "GET",
+        redirect: "follow",
+      }),
+    );
+  });
+
+  it("falls back safely when both VK API and public page are unavailable", async () => {
+    mockVk.api.wall.getById.mockRejectedValueOnce(new Error("VK error 27"));
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error("network unavailable");
+    }));
+    const result = await resolveVkWallComment(mockVk as never, {
+      id: 44, owner_id: -100, post_id: 778, from_id: 123, text: "Цена?", date: 1700000000,
     });
     expect(result?.eventType).toBe("post_comment");
     expect(result?.origin.text).toBeUndefined();
