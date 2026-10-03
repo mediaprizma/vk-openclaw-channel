@@ -266,7 +266,10 @@ export async function sendVkCommentReply(params: {
     return String(commentId ?? response);
   }
 
-  if (params.comment.eventType === "clip_comment" && params.comment.videoId !== undefined) {
+  if (
+    (params.comment.eventType === "clip_comment" || params.comment.eventType === "video_comment") &&
+    params.comment.videoId !== undefined
+  ) {
     const response = await vk.api.video.createComment({
       owner_id: params.comment.ownerId,
       video_id: params.comment.videoId,
