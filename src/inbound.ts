@@ -538,9 +538,12 @@ export async function handleVkInbound(params: {
     MessageSid: message.messageId,
     Timestamp: message.timestamp,
     OriginatingChannel: CHANNEL_ID,
-    OriginatingTo: message.comment
-      ? `vk:comment:${message.comment.eventType}:${message.comment.commentId}`
-      : `vk:${peerId}`,
+    // Keep the durable OpenClaw delivery target canonical. A public VK
+    // comment is not a messages.send peer_id and must never be persisted as
+    // OriginatingTo; restart-recovery and other generic delivery paths consume
+    // this field as a numeric VK peer target. Immediate comment replies use the
+    // in-memory comment route in the dispatcher below.
+    OriginatingTo: `vk:${peerId}`,
     CommandAuthorized: commandGate.commandAuthorized,
     media: media.length > 0 ? media : undefined,
     ...(isQuoteVisible && {
