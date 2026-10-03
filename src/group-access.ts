@@ -43,7 +43,7 @@ export function resolveVkGroupAccess(params: {
   const groupConfig =
     account.config.groups?.[String(params.peerId)] ?? account.config.groups?.["*"];
   const { groupPolicy, providerMissingFallbackApplied } = resolveAllowlistProviderRuntimeGroupPolicy({
-    providerConfigPresent: config.channels?.vk !== undefined,
+    providerConfigPresent: config.channels?.["vk-openclaw-channel"] !== undefined,
     groupPolicy: account.config.groupPolicy,
     defaultGroupPolicy: resolveDefaultGroupPolicy(config as OpenClawConfig),
   });
