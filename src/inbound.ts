@@ -9,7 +9,7 @@ import {
 } from "openclaw/plugin-sdk/channel-feedback";
 import {
   logInboundDrop,
-  toInboundMediaFacts,
+  toInboundMediaFactsWithMetadata,
   type ChannelInboundMediaInput,
 } from "openclaw/plugin-sdk/channel-inbound";
 import {
@@ -491,7 +491,7 @@ export async function handleVkInbound(params: {
     );
   }
 
-  const media = toInboundMediaFacts(
+  const media = await toInboundMediaFactsWithMetadata(
     resolvedMedia.map((entry) => ({
       path: entry.path,
       url: entry.url,
@@ -539,11 +539,10 @@ export async function handleVkInbound(params: {
     MessageSid: message.messageId,
     Timestamp: message.timestamp,
     OriginatingChannel: CHANNEL_ID,
-    // Keep the durable OpenClaw delivery target canonical. A public VK
-    // comment is not a messages.send peer_id and must never be persisted as
-    // OriginatingTo; restart-recovery and other generic delivery paths consume
-    // this field as a numeric VK peer target. Immediate comment replies use the
-    // in-memory comment route in the dispatcher below.
+    // Keep the durable OpenClaw delivery target provider-native. A public VK
+    // comment is not a messages.send peer_id: its target encodes the exact
+    // public thread while resolveOutboundSessionRoute maps it back to the
+    // customer's direct session. Immediate comment replies use the same route.
     OriginatingTo: message.comment
       ? buildVkCommentTarget({
           route: {
