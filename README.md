@@ -1,190 +1,130 @@
-# openclaw-vk
-<img width="500" src="https://github.com/user-attachments/assets/1bb97849-8aa0-46dc-b3de-90e4bcf10d38"/>
+# VK Channel for OpenClaw
 
-Плагин [OpenClaw](https://github.com/openclaw/openclaw) для работы с ВКонтакте. Подключает AI-агента к сообществам VK через Bots Long Poll API — бот принимает и отвечает на сообщения в личных диалогах и групповых беседах.  
-Минимальная требуемая версия OpenClaw: **v2026.8.1**. Поддерживаются те же версии Node.js, что и OpenClaw 2026.8.1: **22.22.3–22.x, 24.15.0–24.x или 25.9.0+**; Node.js 23 и 25.0–25.8 не поддерживаются.
+VK channel integration for [OpenClaw](https://github.com/openclaw/openclaw).
 
-Обычные ответы в личном диалоге отправляются без цитаты. В групповой беседе бот цитирует входящее сообщение, а ответы на callback-кнопки сохраняют привязку к сообщению с кнопкой.
+This project connects an OpenClaw agent to a VK community through the VK Bots Long Poll API. It supports private conversations, group chats, media delivery, keyboards, reactions, progress messages and multiple VK accounts.
 
-## Быстрый старт
+> This repository is an independent development project maintained by **mediaprizma**.
 
-### 1. Подготовка сообщества ВКонтакте
+## Requirements
 
-1. **Создайте сообщество** (группу или паблик), если его ещё нет.
-2. Откройте **Управление → Сообщения** и включите их.
-3. Откройте **Управление → Работа с API → Ключи доступа**, нажмите *Создать ключ* и выберите права:
-   - **Сообщения сообщества**
-   - **Управление сообществом** (необходимо для Bots Long Poll API)
-   - **Фотографии** / `photos` (обязательно для исходящих изображений, включая результаты image-edit)
-   - **Документы** / `docs` (обязательно для исходящих файлов, TTS audio и голосовых сообщений, потому что VK upload идёт через `docs.getMessagesUploadServer`)
-4. Откройте **Управление → Работа с API → Long Poll API**:
-   - Включите Long Poll API.
-   - На вкладке **Типы событий** отметьте **Входящие сообщения**.
-   - Там же отметьте **Действие с сообщением** (`message_event`): без него нажатия на кнопки вопросов агента (`ask_user`, `AskUserQuestion`) до бота не доходят и кнопка крутится. Ответить на вопрос текстом («2», вариант или свой ответ) можно и без этого.
-5. *(Для работы в беседах)* Откройте **Управление → Сообщения → Настройки для бота** и включите *Разрешать добавлять сообщество в чаты*.
+- OpenClaw **2026.9.x or newer**
+- Node.js version supported by the installed OpenClaw release
+- A VK community with a community access token
+- VK Bots Long Poll API enabled
 
-### 2. Установка плагина
-```
-Установи OpenClaw-плагин для vk чётко по инструкции https://github.com/pfrankov/openclaw-vk
-Вот мой токен: vk1.a...
-```
+## Features
+
+- VK private messages
+- VK group conversations
+- Separate OpenClaw sessions for different conversations
+- Multiple VK community accounts
+- Access policies for private and group messages
+- Per-conversation system prompts
+- Markdown-compatible message formatting
+- Images, documents and audio
+- VK keyboards and callback events
+- Message reactions
+- Typing indicators
+- Message editing and deletion
+- Progress/streaming-style status messages
+- OpenClaw secret references for VK tokens
+
+The channel uses the existing OpenClaw channel runtime rather than implementing a separate agent or message-processing system.
+
+## VK community setup
+
+In your VK community:
+
+1. Open **Community management → Messages** and enable community messages.
+2. Open **API usage → Access keys** and create a community token.
+3. Grant the permissions required by the features you plan to use:
+   - **Messages**
+   - **Community management**
+   - **Photos** — for outgoing images
+   - **Documents** — for files and voice messages
+4. Open **API usage → Bots Long Poll API** and enable it.
+5. Enable the event types required by your OpenClaw configuration.
+6. If the bot will be used in group conversations, allow the community to be added to chats.
+
+Keep the community token private. Do not commit it to this repository.
+
+## Installation
+
+For a published package:
 
 ```bash
-# OpenClaw 2026.8.2 requires explicit trust and capability consent
-openclaw plugins install @openclaw-vk/vk --force --accept-capabilities
+openclaw plugins install <package-name> --force --accept-capabilities
+```
+
+For local development:
+
+```bash
+git clone https://github.com/mediaprizma/vk-openclaw-channel.git
+cd vk-openclaw-channel
+npm install
+npm run build
+openclaw plugins install --link ./dist/index.js
+```
+
+Then verify the plugin:
+
+```bash
 openclaw plugins info vk --json
-```
-
-В OpenClaw 2026.8.2 успешная установка сразу включает плагин, поэтому отдельная
-команда `openclaw plugins enable vk` обычно не нужна. Выполните её только если
-`openclaw plugins info vk --json` явно показывает, что уже установленный плагин
-отключён:
-
-```bash
-openclaw plugins enable vk
-```
-
-Флаги `--force --accept-capabilities` подтверждают установку внешнего npm-пакета
-и запрошенные им возможности. Используйте их только для пакета, источник которого
-вы проверили.
-
-### 2.1 Обновление плагина
-
-```bash
-# OpenClaw 2026.8.2 обновляет установленный плагин по его id
-openclaw plugins update vk
-
-# Или обновить все плагины
-openclaw plugins update --all
-
-# Установить конкретную версию
-openclaw plugins install @openclaw-vk/vk@2026.9.4 --force --accept-capabilities
-openclaw gateway restart
 openclaw channels status --json --probe
 ```
 
-> Только для локальной разработки: `openclaw plugins install ~/path/to/openclaw-vk`
+Restart the gateway after configuration changes when required:
 
-Примечание про `plugins.allow`:
-- Если `plugins.allow` отсутствует или пуст, OpenClaw обычно подхватывает внешний плагин `vk` автоматически после `openclaw plugins enable vk` и включённого `channels.vk.enabled`.
-- Если у вас уже используется явный allowlist плагинов (`plugins.allow` не пуст), добавьте туда `"vk"` вручную. Команда `openclaw plugins enable vk` сейчас не дописывает `plugins.allow` автоматически.
-
-Пример для конфигураций с явным allowlist:
-
-```json
-{
-  "plugins": {
-    "allow": ["vk"]
-  },
-  "channels": {
-    "vk": {
-      "enabled": true,
-      "token": "<ВАШ_ТОКЕН>",
-      "dmPolicy": "pairing"
-    }
-  }
-}
+```bash
+openclaw gateway restart
 ```
 
-### 3. Настройка
+## Configuration
 
-Добавьте канал в `~/.openclaw/openclaw.json`:
+Add the VK channel to `~/.openclaw/openclaw.json`:
 
 ```json
 {
   "channels": {
     "vk": {
       "enabled": true,
-      "token": "<ВАШ_ТОКЕН>",
+      "token": "<VK_COMMUNITY_TOKEN>",
       "dmPolicy": "pairing"
     }
   }
 }
 ```
 
-### 4. Запуск
+### Access policies
 
-1. Перезапустите шлюз:
-   ```bash
-   openclaw gateway restart
-   ```
-2. Напишите боту любое сообщение со своего аккаунта ВКонтакте.
-3. Бот ответит **кодом подтверждения** — это механизм авторизации `pairing`, защищающий от нежелательных сообщений.
-4. Подтвердите доступ:
-   ```bash
-   openclaw pairing approve vk <код>
-   ```
+Private messages can use:
 
-Готово — бот отвечает на сообщения.
+- `pairing`
+- `allowlist`
+- `open`
+- `disabled`
 
----
-
-## Конфигурация
-
-### Форматирование сообщений
-
-Входящие ответы обрабатываются как Markdown, но для VK конвертируется только то, что поддерживается `format_data`:
-- `**жирный**`, `*курсив*`, `***жирный курсив***`
-- `[текст](https://example.com)` (ссылка)
-
-Вся остальная разметка остаётся без изменений.
-
-### Параметры
-
-| Параметр | Описание |
-| --- | --- |
-| `token` / `tokenFile` | Ключ доступа сообщества или путь к файлу с токеном. Также поддерживается переменная окружения `VK_TOKEN`. Вместо самого ключа в `token` можно указать ссылку на секрет (SecretRef), см. ниже. |
-| `dmPolicy` | Политика личных сообщений: `pairing` (авторизация по коду), `allowlist` (по списку), `open` (без ограничений), `disabled`. |
-| `allowFrom` | Список ID пользователей, которым разрешён доступ при политике `allowlist`. |
-| `defaultTo` | Цель по умолчанию для исходящих сообщений, если target не был указан явно. |
-| `groupPolicy` | Политика для групповых бесед: `allowlist`, `open`, `disabled`. |
-| `groupAllowFrom` | Список ID пользователей, которым разрешено писать боту в групповых беседах при `groupPolicy: "allowlist"`. Это не список `peerId` бесед. |
-| `contextVisibility` | Какой чужой контекст видит агент в группе: `all` (по умолчанию), `allowlist` (только авторы из `groupAllowFrom`) или `allowlist_quote` (те же пересылки, но цитаты видны). Можно переопределить для отдельного аккаунта. В личном диалоге фильтр не применяется. |
-| `audio` | Пределы исходящих голосовых сообщений для всего канала: `maxVoiceMs`, `maxSegments`, `maxInputBytes`, `remoteMaxBytes`, `splitDeadlineMs`, `splitTimeoutMs`. Значения должны быть положительными целыми числами; внутри `accounts` этот блок не допускается. |
-| `streaming` | Черновик шагов, как `streaming.mode: "progress"` у Telegram: при `mode: "progress"` ход с вызовами инструментов показывается в одном сообщении, которое правится на месте и в конце становится ответом. Строки шагов (`🛠️ …`) включает `progress.toolProgress: true`: в OpenClaw 2026.9.6 без него в черновике только заголовок. Заголовок задаётся `progress.label`. Остальные ключи `progress` — общие для каналов OpenClaw. Допустимы только режимы `off` и `progress`. Задаётся на весь канал; внутри `accounts` этот блок не допускается. По умолчанию выключен. |
-
-Черновик шагов с заголовком и строками шагов:
+Example:
 
 ```json
 {
   "channels": {
     "vk": {
-      "streaming": {
-        "mode": "progress",
-        "progress": { "label": "⏳ Работаю", "toolProgress": true }
-      }
+      "enabled": true,
+      "token": "<VK_COMMUNITY_TOKEN>",
+      "dmPolicy": "allowlist",
+      "allowFrom": [123456789]
     }
   }
 }
 ```
 
-В групповой беседе черновик цитирует входящее сообщение, как обычный ответ. Ответ на нажатие кнопки приходит обычным сообщением и снимает клавиатуру, а черновик удаляется.
+For group conversations, use `groupPolicy` and `groupAllowFrom`.
 
-### Токен как ссылка на секрет (SecretRef)
+### Per-conversation settings
 
-Чтобы ключ не лежал в `openclaw.json` открытым текстом, `token` — на уровне канала или в `accounts.<id>` — может ссылаться на секрет, который шлюз достаёт при запуске:
-
-```json
-{
-  "channels": {
-    "vk": {
-      "token": { "source": "exec", "provider": "my-keychain", "id": "vk-group-token" }
-    }
-  }
-}
-```
-
-Провайдер объявляется в `secrets.providers`; годится и `{ "source": "env", "provider": "default", "id": "VK_GROUP_TOKEN" }`. Порядок прежний: `VK_TOKEN`, затем `tokenFile`, затем `token`. Поэтому при непустом `tokenFile` — своём у учётной записи или унаследованном с уровня канала — ссылка в `token` не разрешается вовсе и недоступной учётную запись не делает: читается файл. Если ссылку разрешить не удалось, шлюз помечает учётную запись недоступной и не запускает её, остальные каналы работают; в логе названа неразрешённая ссылка. Проверка — `openclaw secrets audit`, после починки провайдера — `openclaw secrets reload`.
-
-Длинная озвучка отправляется несколькими голосовыми, если каждую часть удалось проверить. Если нарезка не удалась, исходный файл отправляется документом. Для этого на хосте нужны `ffmpeg` и `ffprobe`; в случае частичной доставки плагин не повторяет уже отправленную часть текстом. Посты со стены и пересланные сообщения видны агенту как контекст, но их текст не используется как команда или упоминание бота. Из чужих вложений загружаются только изображения.
-
-### Настройка отдельных бесед
-
-Для каждой беседы можно задать индивидуальные параметры:
-- `enabled`: полностью отключить обработку конкретной беседы
-- `allowFrom`: переопределить sender allowlist только для этой беседы
-- `requireMention`: требовать упоминание бота
-- `systemPrompt`: отдельный системный prompt для конкретного чата
+Individual group conversations can have their own settings:
 
 ```json
 {
@@ -195,10 +135,7 @@ openclaw channels status --json --probe
           "enabled": true,
           "allowFrom": [123456789],
           "requireMention": true,
-          "systemPrompt": "Ты — помощник в рабочем чате. Отвечай кратко."
-        },
-        "*": {
-          "requireMention": false
+          "systemPrompt": "Отвечай кратко и по существу."
         }
       }
     }
@@ -206,11 +143,9 @@ openclaw channels status --json --probe
 }
 ```
 
-Если в беседе нужно разрешить сообщения только нескольким участникам, используйте `groups.<peerId>.allowFrom`. Это переопределяет общий `groupAllowFrom` для конкретного чата.
+### Multiple VK communities
 
-### Несколько сообществ
-
-Для подключения нескольких ботов к одному ядру используйте секцию `accounts`:
+Multiple VK community tokens can be configured as separate accounts:
 
 ```json
 {
@@ -219,7 +154,7 @@ openclaw channels status --json --probe
       "accounts": {
         "sales": {
           "enabled": true,
-          "token": "<ТОКЕН_ПРОДАЖ>",
+          "token": "<SALES_TOKEN>",
           "dmPolicy": "allowlist",
           "allowFrom": ["*"]
         },
@@ -234,66 +169,121 @@ openclaw channels status --json --probe
 }
 ```
 
----
+## Token security
 
-## Решение проблем
+A token may be supplied through:
 
-Проверьте статус подключения:
+- `token`
+- `tokenFile`
+- `VK_TOKEN`
+- an OpenClaw SecretRef
+
+Example SecretRef:
+
+```json
+{
+  "channels": {
+    "vk": {
+      "token": {
+        "source": "env",
+        "provider": "default",
+        "id": "VK_TOKEN"
+      }
+    }
+  }
+}
+```
+
+For production installations, prefer a secret provider or a protected token file instead of storing credentials directly in the OpenClaw configuration.
+
+## Media
+
+The channel supports outgoing:
+
+- images
+- documents
+- audio
+- voice messages
+
+VK community tokens need the corresponding `photos` and `docs` permissions for these operations.
+
+If an image URL cannot be downloaded directly by VK, the channel can fall back to downloading the media through the OpenClaw host and uploading it to VK.
+
+## Formatting
+
+OpenClaw responses can use Markdown-style formatting supported by VK's `format_data`, including:
+
+- **bold**
+- *italic*
+- ***bold italic***
+- [links](https://example.com)
+
+Unsupported Markdown is sent as ordinary text.
+
+## Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Build:
+
+```bash
+npm run build
+```
+
+Run tests:
+
+```bash
+npm test
+```
+
+Type checking and project-specific validation should be run before publishing changes.
+
+## Troubleshooting
+
+Check the channel:
 
 ```bash
 openclaw channels status --json --probe
 ```
 
-**`Group authorization failed: group revoke access for this token`** — ключ доступа устарел или отозван. Перевыпустите токен в настройках сообщества, обновите конфигурацию и перезапустите шлюз.
+Check plugin information:
 
-**Статус `running: false` при `configured: true`** — неверный токен. Подробности в поле `lastError` вывода команды статуса.
+```bash
+openclaw plugins info vk --json
+```
 
-**`APIError: Code №15 - Access denied: no access to call this method. It cannot be called with current scopes.` при отправке изображений/аудио/документов** — у текущего community token нет прав `photos` и/или `docs`.
+If the channel is configured but not running, inspect the OpenClaw gateway logs and verify:
 
-Как исправить:
-1. Откройте сообщество во ВКонтакте.
-2. Перейдите в **Управление → Дополнительно → Работа с API → Ключи доступа**.
-3. Нажмите **Создать ключ**.
-4. В списке прав обязательно отметьте:
-   - **Сообщения сообщества** / `messages`
-   - **Управление сообществом** / `manage`
-   - **Фотографии** / `photos`
-   - **Документы** / `docs`
-5. Подтвердите создание ключа в мобильном приложении VK.
-6. Обновите `channels.vk.token` в `~/.openclaw/openclaw.json`.
-7. Перезапустите шлюз:
-   ```bash
-   openclaw gateway restart
-   ```
+1. the VK token is valid;
+2. Bots Long Poll API is enabled;
+3. required VK event types are enabled;
+4. the plugin is enabled;
+5. the configured access policy allows the sender;
+6. the gateway has been restarted after relevant configuration changes.
 
-Проверка:
-- `photos.getMessagesUploadServer` требует право `photos` и используется для исходящих изображений.
-- `docs.getMessagesUploadServer` требует право `docs` и используется для `doc` и `audio_message`, поэтому без него исходящие файлы и голосовые не отправятся.
-- Исходящие `audio/*` вложения плагин отправляет как `audio_message` (голосовое). Если нужен обычный файл, используйте `forceDocument`.
-- Текущие права токена можно проверить через `groups.getTokenPermissions`.
-- Если после обновления токена `groups.getTokenPermissions` показывает только `messages` и `manage`, создайте новый ключ заново и убедитесь, что `photos` и `docs` отмечены при создании.
+For media errors involving access scopes, recreate the community token with the required VK permissions and restart the OpenClaw gateway.
 
-Отдельный симптом:
-- **`APIError: Code №100 - One of the parameters specified was missing or invalid: photo is undefined`** при отправке картинки по URL. Это означает, что исходный URL недоступен для загрузки как изображение (часто 404/403, редирект на HTML или временная ссылка без публичного доступа).
-  Плагин пытается автоматически:
-  1. повторить отправку через локальный upload (скачать URL на стороне OpenClaw и загрузить в VK как файл),
-  2. если скачать не удалось, отправить текст + исходный URL, чтобы сообщение не терялось в очереди.
-  Чтобы изображение ушло именно вложением, URL должен быть публичным, отдавать `image/*` и быть доступным с хоста OpenClaw (проверьте `curl -I <url>` прямо на сервере).
+## Roadmap
 
-Официальная документация VK:
-- Настройки community token: <https://dev.vk.com/ru/api/access-token/community-token/in-community-settings>
-- Проверка прав токена: <https://dev.vk.com/ru/method/groups.getTokenPermissions>
-- Upload для изображений: <https://dev.vk.com/ru/method/photos.getMessagesUploadServer>
-- Upload для документов и голосовых: <https://dev.vk.com/ru/method/docs.getMessagesUploadServer>
+The repository is intended to evolve beyond basic VK message transport.
 
-**`Plugin "vk" state migration is pending` в `openclaw doctor` / `Startup migrations need attention` в `openclaw status`** — установлена версия плагина без Doctor-контракта (`doctorContract` в манифесте). Канал при этом работает, но шлюз стартует в «degraded state». Обновите плагин до версии с контрактом, затем выполните `openclaw doctor --fix` и перезапустите шлюз.
+Planned work includes:
 
-**Бот не отвечает, ошибок нет** — сообщения отклоняются политиками доступа. Проверьте `dmPolicy`, `allowFrom` и `requireMention`. Логи: `~/.openclaw/logs/commands.log` (фильтруйте по `"source":"vk"`).
+- processing comments on VK wall posts;
+- processing comments on VK Clips;
+- passing post/clip context to the OpenClaw agent;
+- AI-assisted comment analysis;
+- configurable automatic replies;
+- comment deduplication and loop protection;
+- moderation and filtering rules;
+- rate limiting for automated replies.
 
----
+These features will be implemented directly in this project rather than depending on the architecture of the original upstream implementation.
 
-## Лицензия
+## License
 
-Copyright 2026 Pavel Frankov
-
-[Apache License 2.0](LICENSE).
+See [LICENSE](LICENSE).
