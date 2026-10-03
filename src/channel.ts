@@ -11,6 +11,7 @@ import { createAccountStatusSink } from "openclaw/plugin-sdk/channel-outbound";
 import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/account-id";
 import type { ChannelStatusIssue } from "openclaw/plugin-sdk/channel-contract";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
+import { buildChannelOutboundSessionRoute } from "openclaw/plugin-sdk/channel-core";
 import type { ChannelPlugin } from "openclaw/plugin-sdk/core";
 import {
   describeMissingVkToken,
@@ -38,6 +39,7 @@ import {
   sendMessageVk,
   sendPayloadVk,
 } from "./send.js";
+import { parseVkCommentTarget } from "./types.js";
 import type { CoreConfig, VkConfig, VkProbe } from "./types.js";
 
 /**
@@ -85,6 +87,33 @@ const VK_DM_APPROVE_HINT = "openclaw pairing approve vk <code>";
 const VK_OPEN_GROUP_WARNING =
   '- VK group chats: groupPolicy="open" allows any member in group chats to trigger. ' +
   'Set channels.vk-openclaw-channel.groupPolicy="allowlist" + channels.vk-openclaw-channel.groupAllowFrom to restrict senders.';
+
+function resolveVkOutboundSessionRoute(params: {
+  cfg: OpenClawConfig;
+  agentId: string;
+  accountId?: string | null;
+  target: string;
+  resolvedTarget?: { kind: string };
+  replyToId?: string | null;
+  threadId?: string | number | null;
+  currentSessionKey?: string | null;
+}) {
+  const commentTarget = parseVkCommentTarget(params.target);
+  if (!commentTarget) return null;
+
+  const accountId = params.accountId ?? DEFAULT_ACCOUNT_ID;
+  return buildChannelOutboundSessionRoute({
+    cfg: params.cfg,
+    agentId: params.agentId,
+    channel: VK_CHANNEL_KEY,
+    accountId,
+    recipientSessionExact: true,
+    peer: { kind: "direct", id: String(commentTarget.senderId) },
+    chatType: "direct",
+    from: params.target,
+    to: params.target,
+  });
+}
 
 function normalizeVkDmAllowEntry(raw: string): string {
   return raw.replace(/^vk:(?:user:)?/i, "");
@@ -272,43 +301,50 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
   messaging: {
     normalizeTarget: (target) => {
       const trimmed = target.trim();
-      if (!trimmed) {
-        return undefined;
+      if (!trimmed) return undefined;
+      if (parseVkCommentTarget(trimmed)) return trimmed;
+      if (/^comment:(?:post_comment|clip_comment|video_comment):/i.test(trimmed)) {
+        return `vk:${trimmed}`;
       }
       return trimmed.replace(/^vk:(?:user:|chat:)?/i, "");
     },
     parseExplicitTarget: ({ raw }) => {
-      const normalized = raw.trim().replace(/^vk:(?:user:|chat:)?/i, "");
-      if (!normalized) {
-        return null;
+      const trimmed = raw.trim();
+      const normalized = parseVkCommentTarget(trimmed)
+        ? trimmed
+        : /^comment:(?:post_comment|clip_comment|video_comment):/i.test(trimmed)
+          ? `vk:${trimmed}`
+          : trimmed.replace(/^vk:(?:user:|chat:)?/i, "");
+      if (!normalized) return null;
+
+      const commentTarget = parseVkCommentTarget(normalized);
+      if (commentTarget) {
+        return { to: normalized, chatType: "direct" as const };
       }
+
       const peerId = Number(normalized);
-      if (Number.isNaN(peerId)) {
-        return null;
-      }
+      if (Number.isNaN(peerId)) return null;
       return {
         to: normalized,
         chatType: isVkGroupPeerId(peerId) ? ("group" as const) : ("direct" as const),
       };
     },
     inferTargetChatType: ({ to }) => {
+      if (parseVkCommentTarget(to.trim())) return "direct";
       const normalized = to.trim().replace(/^vk:(?:user:|chat:)?/i, "");
       const peerId = Number(normalized);
-      if (Number.isNaN(peerId)) {
-        return undefined;
-      }
+      if (Number.isNaN(peerId)) return undefined;
       return isVkGroupPeerId(peerId) ? ("group" as const) : ("direct" as const);
     },
     targetResolver: {
       looksLikeId: (id) => {
         const trimmed = id?.trim();
-        if (!trimmed) {
-          return false;
-        }
-        return /^\d+$/.test(trimmed) || /^vk:/i.test(trimmed);
+        if (!trimmed) return false;
+        return /^\d+$/.test(trimmed) || /^vk:/i.test(trimmed) || /^comment:/i.test(trimmed);
       },
-      hint: "<userId|peerId>",
+      hint: "<userId|peerId|commentRoute>",
     },
+    resolveOutboundSessionRoute: resolveVkOutboundSessionRoute,
   },
   directory: {
     self: async () => null,

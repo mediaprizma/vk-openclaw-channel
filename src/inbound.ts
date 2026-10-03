@@ -68,6 +68,7 @@ import type {
   VkInboundAttachment,
   VkInboundForward,
   VkInboundMessage,
+  buildVkCommentTarget,
 } from "./types.js";
 
 const CHANNEL_ID = "vk-openclaw-channel" as const;
@@ -543,7 +544,20 @@ export async function handleVkInbound(params: {
     // OriginatingTo; restart-recovery and other generic delivery paths consume
     // this field as a numeric VK peer target. Immediate comment replies use the
     // in-memory comment route in the dispatcher below.
-    OriginatingTo: `vk:${peerId}`,
+    OriginatingTo: message.comment
+      ? buildVkCommentTarget({
+          route: {
+            type: message.comment.eventType,
+            ownerId: message.comment.ownerId,
+            contentId: message.comment.postId ?? message.comment.videoId!,
+            commentId: message.comment.commentId,
+            ...(message.comment.replyToComment !== undefined
+              ? { parentCommentId: message.comment.replyToComment }
+              : {}),
+          },
+          senderId: message.comment.senderId,
+        })
+      : `vk:${peerId}`,
     CommandAuthorized: commandGate.commandAuthorized,
     media: media.length > 0 ? media : undefined,
     ...(isQuoteVisible && {

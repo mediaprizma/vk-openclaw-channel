@@ -38,6 +38,57 @@ export type VkCommentReplyRoute = {
   parentCommentId?: number;
 };
 
+export function buildVkCommentTarget(params: {
+  route: VkCommentReplyRoute;
+  senderId: number;
+}): string {
+  return [
+    "vk:comment",
+    params.route.type,
+    params.route.ownerId,
+    params.route.contentId,
+    params.route.commentId,
+    params.senderId,
+  ].join(":");
+}
+
+export function parseVkCommentTarget(value: string): {
+  route: VkCommentReplyRoute;
+  senderId: number;
+} | undefined {
+  const match =
+    /^vk:comment:(post_comment|clip_comment|video_comment):(-?\d+):(\d+):(\d+):(-?\d+)$/.exec(
+      value.trim(),
+    );
+  if (!match) return undefined;
+
+  const ownerId = Number(match[2]);
+  const contentId = Number(match[3]);
+  const commentId = Number(match[4]);
+  const senderId = Number(match[5]);
+  if (
+    !Number.isInteger(ownerId) ||
+    !Number.isInteger(contentId) ||
+    !Number.isInteger(commentId) ||
+    !Number.isInteger(senderId) ||
+    contentId <= 0 ||
+    commentId <= 0 ||
+    senderId === 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    route: {
+      type: match[1] as VkCommentReplyRoute["type"],
+      ownerId,
+      contentId,
+      commentId,
+    },
+    senderId,
+  };
+}
+
 export type VkInboundComment = {
   eventType: VkCommentEventType;
   commentId: number;
