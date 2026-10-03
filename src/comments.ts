@@ -113,17 +113,16 @@ function collectVkPublicImageUrls(html: string): string[] {
 }
 
 function extractVkPublicMeta(html: string, key: "og:description" | "og:title"): string | undefined {
-  const escapedKey = key.replace(":", "\\:");
-  const patterns = [
-    new RegExp(
-      `<meta\\\\b[^>]*(?:property|name)=["']${escapedKey}["'][^>]*\\\\bcontent=["']([^"']*)["'][^>]*>`,
-      "i",
-    ),
-    new RegExp(
-      `<meta\\\\b[^>]*\\\\bcontent=["']([^"']*)["'][^>]*(?:property|name)=["']${escapedKey}["'][^>]*>`,
-      "i",
-    ),
-  ];
+  const patterns =
+    key === "og:description"
+      ? [
+          /<meta\b[^>]*(?:property|name)=["']og:description["'][^>]*\bcontent=["']([^"']*)["'][^>]*>/i,
+          /<meta\b[^>]*\bcontent=["']([^"']*)["'][^>]*(?:property|name)=["']og:description["'][^>]*>/i,
+        ]
+      : [
+          /<meta\b[^>]*(?:property|name)=["']og:title["'][^>]*\bcontent=["']([^"']*)["'][^>]*>/i,
+          /<meta\b[^>]*\bcontent=["']([^"']*)["'][^>]*(?:property|name)=["']og:title["'][^>]*>/i,
+        ];
 
   for (const pattern of patterns) {
     const match = html.match(pattern);
