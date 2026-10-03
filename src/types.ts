@@ -16,6 +16,41 @@ export type VkSecretRef = {
   id?: string;
 };
 
+export type VkCommentEventType = "post_comment" | "clip_comment" | "video_comment";
+
+export type VkCommentSource = {
+  type: "post" | "clip" | "video";
+  ownerId: number;
+  id: number;
+  url: string;
+  text?: string;
+  title?: string;
+  media: VkInboundAttachment[];
+};
+
+export type VkPostOrigin = VkCommentSource;
+
+export type VkCommentReplyRoute = {
+  type: "post_comment" | "clip_comment";
+  ownerId: number;
+  contentId: number;
+  commentId: number;
+  parentCommentId?: number;
+};
+
+export type VkInboundComment = {
+  eventType: VkCommentEventType;
+  commentId: number;
+  senderId: number;
+  text: string;
+  timestamp: number;
+  ownerId: number;
+  postId?: number;
+  videoId?: number;
+  replyToComment?: number;
+  origin: VkPostOrigin;
+};
+
 export type VkAccountConfig = {
   name?: string;
   enabled?: boolean;
@@ -31,6 +66,12 @@ export type VkAccountConfig = {
   transport?: { silenceMs?: number };
   /** Which forwards reach the agent in groups; see `VK_CONTEXT_VISIBILITY_MODES`. */
   contextVisibility?: VkContextVisibility;
+  comments?: {
+    enabled?: boolean;
+    postComments?: boolean;
+    clipComments?: boolean;
+    videoComments?: boolean;
+  };
   groups?: Record<
     string,
     {
@@ -80,6 +121,9 @@ export type VkInboundForward = {
 };
 
 export type VkInboundMessage = {
+  eventType?: "message";
+  comment?: VkInboundComment;
+  replyRoute?: VkCommentReplyRoute;
   messageId: string;
   conversationMessageId?: number;
   peerId: number;
@@ -144,7 +188,7 @@ export type VkProbe = {
 
 export type CoreConfig = {
   channels?: {
-    vk?: VkConfig;
+    "vk-openclaw-channel"?: VkConfig;
     [key: string]: unknown;
   };
   [key: string]: unknown;
