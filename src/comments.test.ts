@@ -144,6 +144,21 @@ describe("VK comments", () => {
     expect(text).toContain("предложи клиенту написать в личные сообщения");
   });
 
+  it("renders a custom VK comment prompt template", () => {
+    const comment = {
+      eventType: "post_comment",
+      commentId: 42,
+      senderId: 123,
+      text: "Цена?",
+      timestamp: 1700000000000,
+      ownerId: -100,
+      postId: 777,
+      origin: { type: "post", ownerId: -100, id: 777, url: "https://vk.com/wall-100_777", media: [] },
+    } satisfies VkInboundComment;
+    const text = formatVkCommentContext(comment, "Клиент {{sender_id}} спросил: {{comment_text}}\nПост: {{origin_url}}");
+    expect(text).toBe("Клиент 123 спросил: Цена?\nПост: https://vk.com/wall-100_777");
+  });
+
   it("sends a wall comment reply to the original comment", async () => {
     mockVk.api.wall.createComment.mockResolvedValueOnce({ comment_id: 501 });
     const comment = {
