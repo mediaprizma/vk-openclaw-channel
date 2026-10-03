@@ -53,18 +53,18 @@ function resolveVkAccountStopSignal(accountId?: string | null): AbortSignal | un
 }
 
 const meta = {
-  id: "vk",
+  id: "vk-openclaw-channel",
   label: "VK",
   selectionLabel: "VK (VKontakte Bot)",
   detailLabel: "VK Bot",
-  docsPath: "/channels/vk",
-  docsLabel: "vk",
+  docsPath: "/channels/vk-openclaw-channel",
+  docsLabel: "vk-openclaw-channel",
   blurb: "VK (VKontakte) community bot via Long Poll API.",
   systemImage: "message.fill",
 };
 
 const vkConfigAdapter = createScopedChannelConfigAdapter<ResolvedVkAccount, ResolvedVkAccount, OpenClawConfig>({
-  sectionKey: "vk",
+  sectionKey: "vk-openclaw-channel",
   listAccountIds: (cfg) => listVkAccountIds(cfg),
   resolveAccount: adaptScopedAccountAccessor((params) => resolveVkAccount(params)),
   defaultAccountId: (cfg) => resolveDefaultVkAccountId(cfg),
@@ -80,11 +80,11 @@ const vkConfigAdapter = createScopedChannelConfigAdapter<ResolvedVkAccount, Reso
 
 type VkGroupPolicy = "open" | "allowlist" | "disabled";
 
-const VK_CHANNEL_KEY = "vk";
+const VK_CHANNEL_KEY = "vk-openclaw-channel";
 const VK_DM_APPROVE_HINT = "openclaw pairing approve vk <code>";
 const VK_OPEN_GROUP_WARNING =
   '- VK group chats: groupPolicy="open" allows any member in group chats to trigger. ' +
-  'Set channels.vk.groupPolicy="allowlist" + channels.vk.groupAllowFrom to restrict senders.';
+  'Set channels.vk-openclaw-channel.groupPolicy="allowlist" + channels.vk-openclaw-channel.groupAllowFrom to restrict senders.';
 
 function normalizeVkDmAllowEntry(raw: string): string {
   return raw.replace(/^vk:(?:user:)?/i, "");
@@ -186,7 +186,7 @@ function logVkOutbound(
 }
 
 export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
-  id: "vk",
+  id: "vk-openclaw-channel",
   meta: {
     ...meta,
     quickstartAllowFrom: true,
@@ -225,7 +225,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
     nativeCommands: false,
     blockStreaming: true,
   },
-  reload: { configPrefixes: ["channels.vk"] },
+  reload: { configPrefixes: ["channels.vk-openclaw-channel"] },
   configSchema: buildChannelConfigSchema(VkConfigSchema),
   secrets: {
     secretTargetRegistryEntries,
@@ -359,8 +359,8 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         messageId: result?.messageId,
       });
       return result
-        ? { channel: "vk", ...result }
-        : { channel: "vk", messageId: "", chatId: to };
+        ? { channel: "vk-openclaw-channel", ...result }
+        : { channel: "vk-openclaw-channel", messageId: "", chatId: to };
     },
     sendFormattedText: async ({ cfg, to, text, accountId, replyToId }) => {
       const results = await sendFormattedTextVk(to, text, {
@@ -373,7 +373,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         media: false,
         messageId: results.at(-1)?.messageId,
       });
-      return results.map((result) => ({ channel: "vk" as const, ...result }));
+      return results.map((result) => ({ channel: "vk-openclaw-channel" as const, ...result }));
     },
     sendFormattedMedia: async ({ cfg, to, text, mediaUrl, mediaLocalRoots, accountId, replyToId, forceDocument }) => {
       const result = await sendFormattedMediaVk(to, text, mediaUrl, {
@@ -385,7 +385,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         forceDocument: forceDocument ?? undefined,
       });
       logVkOutbound("sendFormattedMedia", to, { textLen: text.length, media: true, messageId: result.messageId });
-      return { channel: "vk", ...result };
+      return { channel: "vk-openclaw-channel", ...result };
     },
     sendText: async ({ cfg, to, text, accountId, replyToId }) => {
       const result = await sendMessageVk(to, text, {
@@ -394,7 +394,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         replyTo: replyToId ?? undefined,
       });
       logVkOutbound("sendText", to, { textLen: text.length, media: false, messageId: result.messageId });
-      return { channel: "vk", ...result };
+      return { channel: "vk-openclaw-channel", ...result };
     },
     sendMedia: async ({ cfg, to, text, mediaUrl, mediaLocalRoots, accountId, replyToId, forceDocument }) => {
       // `mediaUrl` is optional in the core contract. Without it there is nothing
@@ -408,7 +408,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
           replyTo: replyToId ?? undefined,
         });
         logVkOutbound("sendMedia", to, { textLen: text?.length ?? 0, media: false, messageId: textOnly.messageId });
-        return { channel: "vk", ...textOnly };
+        return { channel: "vk-openclaw-channel", ...textOnly };
       }
       const result = await sendFormattedMediaVk(to, text, mediaUrl, {
         cfg,
@@ -419,7 +419,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         forceDocument: forceDocument ?? undefined,
       });
       logVkOutbound("sendMedia", to, { textLen: text?.length ?? 0, media: true, messageId: result.messageId });
-      return { channel: "vk", ...result };
+      return { channel: "vk-openclaw-channel", ...result };
     },
   },
   status: {
@@ -436,7 +436,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         const accountId = account.accountId ?? DEFAULT_ACCOUNT_ID;
         if (!account.configured) {
           issues.push({
-            channel: "vk",
+            channel: "vk-openclaw-channel",
             accountId,
             kind: "config",
             message: "VK community access token not configured",
