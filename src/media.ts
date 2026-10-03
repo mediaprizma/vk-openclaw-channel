@@ -687,9 +687,19 @@ export async function resolveVkInboundResolvedMedia(params: {
   for (const attachment of attachments) {
     const url = attachment.url?.trim();
     if (!url) {
+      params.logError?.(`vk: inbound media skipped: attachment has no URL (type=${attachment.type}, kind=${attachment.kind})`);
       continue;
     }
-    if (!params.mediaRuntime || !shouldMaterializeVkInboundAttachment(attachment)) {
+
+    const materialize = shouldMaterializeVkInboundAttachment(attachment);
+    params.logError?.(
+      `vk: inbound media candidate: type=${attachment.type} kind=${attachment.kind} mime=${attachment.mimeType ?? "unknown"} materialize=${materialize} url=${url.slice(0, 180)}`,
+    );
+
+    if (!params.mediaRuntime || !materialize) {
+      params.logError?.(
+        `vk: inbound media not materialized: runtime=${Boolean(params.mediaRuntime)} materialize=${materialize}`,
+      );
       out.push({
         url,
         contentType: attachment.mimeType,
@@ -706,6 +716,9 @@ export async function resolveVkInboundResolvedMedia(params: {
         maxBytes,
         filePathHint: fileHint,
       });
+      params.logError?.(
+        `vk: inbound media saved: path=${saved.path} contentType=${saved.contentType ?? attachment.mimeType ?? "unknown"}`,
+      );
       out.push({
         path: saved.path,
         url,
