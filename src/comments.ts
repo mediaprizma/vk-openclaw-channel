@@ -251,7 +251,7 @@ export async function sendVkCommentReply(params: {
   const group = await resolveVkOwnGroup(params.token);
   const fromGroup = group?.id;
 
-  if (params.comment.eventType === "post_comment") {
+  if ((params.comment.eventType === "post_comment" || params.comment.eventType === "clip_comment") && params.comment.postId !== undefined) {
     const response = await vk.api.wall.createComment({
       owner_id: params.comment.ownerId,
       post_id: params.comment.postId!,
