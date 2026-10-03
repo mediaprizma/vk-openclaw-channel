@@ -1,4 +1,4 @@
-import type { ChannelPlugin } from "openclaw/plugin-sdk/core";
+import type { ChannelPlugin } from "openclaw/plugin-sdk/channel-core";
 import { defineChannelPluginEntry } from "openclaw/plugin-sdk/core";
 import { vkPlugin } from "./src/channel.js";
 import { setVkRuntime } from "./src/runtime.js";
