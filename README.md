@@ -1,63 +1,63 @@
-# VK Channel for OpenClaw
+# VK-канал для OpenClaw
 
-VK channel integration for [OpenClaw](https://github.com/openclaw/openclaw).
+Интеграция ВКонтакте с [OpenClaw](https://github.com/openclaw/openclaw).
 
-This project connects an OpenClaw agent to a VK community through the VK Bots Long Poll API. It supports private conversations, group chats, media delivery, keyboards, reactions, progress messages and multiple VK accounts.
+Этот проект подключает агента OpenClaw к сообществу ВКонтакте через VK Bots Long Poll API. Поддерживаются личные сообщения, групповые чаты, передача медиафайлов, клавиатуры, реакции, сообщения о процессе обработки и несколько VK-аккаунтов.
 
-> This repository is an independent development project maintained by **mediaprizma**.
+> Этот репозиторий является независимым проектом, который развивается и поддерживается **mediaprizma**.
 
-## Requirements
+## Требования
 
-- OpenClaw **2026.9.x or newer**
-- Node.js version supported by the installed OpenClaw release
-- A VK community with a community access token
-- VK Bots Long Poll API enabled
+- OpenClaw **2026.9.x или новее**
+- Версия Node.js, поддерживаемая установленной версией OpenClaw
+- Сообщество ВКонтакте с токеном сообщества
+- Включённый VK Bots Long Poll API
 
-## Features
+## Возможности
 
-- VK private messages
-- VK group conversations
-- Separate OpenClaw sessions for different conversations
-- Multiple VK community accounts
-- Access policies for private and group messages
-- Per-conversation system prompts
-- Markdown-compatible message formatting
-- Images, documents and audio
-- VK keyboards and callback events
-- Message reactions
-- Typing indicators
-- Message editing and deletion
-- Progress/streaming-style status messages
-- OpenClaw secret references for VK tokens
+- Личные сообщения ВКонтакте
+- Групповые беседы ВКонтакте
+- Отдельные сессии OpenClaw для разных диалогов
+- Несколько сообществ ВКонтакте
+- Политики доступа для личных и групповых сообщений
+- Отдельные системные промпты для разных диалогов
+- Форматирование сообщений в стиле Markdown
+- Изображения, документы и аудио
+- Клавиатуры ВКонтакте и callback-события
+- Реакции на сообщения
+- Индикатор набора текста
+- Редактирование и удаление сообщений
+- Статусные сообщения о ходе обработки
+- Ссылки OpenClaw SecretRef для хранения токенов VK
 
-The channel uses the existing OpenClaw channel runtime rather than implementing a separate agent or message-processing system.
+Канал использует существующий runtime каналов OpenClaw и не создаёт отдельную систему агентов или обработки сообщений.
 
-## VK community setup
+## Настройка сообщества ВКонтакте
 
-In your VK community:
+В настройках сообщества ВКонтакте:
 
-1. Open **Community management → Messages** and enable community messages.
-2. Open **API usage → Access keys** and create a community token.
-3. Grant the permissions required by the features you plan to use:
-   - **Messages**
-   - **Community management**
-   - **Photos** — for outgoing images
-   - **Documents** — for files and voice messages
-4. Open **API usage → Bots Long Poll API** and enable it.
-5. Enable the event types required by your OpenClaw configuration.
-6. If the bot will be used in group conversations, allow the community to be added to chats.
+1. Откройте **Управление сообществом → Сообщения** и включите сообщения сообщества.
+2. Откройте **Работа с API → Ключи доступа** и создайте токен сообщества.
+3. Выдайте разрешения, необходимые для используемых функций:
+   - **Сообщения**
+   - **Управление сообществом**
+   - **Фотографии** — для отправки изображений
+   - **Документы** — для файлов и голосовых сообщений
+4. Откройте **Работа с API → Long Poll API** и включите его.
+5. Включите необходимые типы событий для вашей конфигурации OpenClaw.
+6. Если бот будет использоваться в групповых беседах, разрешите добавление сообщества в беседы.
 
-Keep the community token private. Do not commit it to this repository.
+Храните токен сообщества в секрете. Не добавляйте его в этот репозиторий.
 
-## Installation
+## Установка
 
-For a published package:
+Для опубликованного npm-пакета:
 
 ```bash
-openclaw plugins install <package-name> --force --accept-capabilities
+openclaw plugins install <имя-пакета> --force --accept-capabilities
 ```
 
-For local development:
+Для локальной разработки:
 
 ```bash
 git clone https://github.com/mediaprizma/vk-openclaw-channel.git
@@ -67,22 +67,22 @@ npm run build
 openclaw plugins install --link ./dist/index.js
 ```
 
-Then verify the plugin:
+После установки проверьте плагин:
 
 ```bash
 openclaw plugins info vk --json
 openclaw channels status --json --probe
 ```
 
-Restart the gateway after configuration changes when required:
+После изменения конфигурации при необходимости перезапустите Gateway:
 
 ```bash
 openclaw gateway restart
 ```
 
-## Configuration
+## Конфигурация
 
-Add the VK channel to `~/.openclaw/openclaw.json`:
+Добавьте VK-канал в `~/.openclaw/openclaw.json`:
 
 ```json
 {
@@ -96,16 +96,16 @@ Add the VK channel to `~/.openclaw/openclaw.json`:
 }
 ```
 
-### Access policies
+### Политики доступа
 
-Private messages can use:
+Для личных сообщений доступны:
 
 - `pairing`
 - `allowlist`
 - `open`
 - `disabled`
 
-Example:
+Пример:
 
 ```json
 {
@@ -120,11 +120,11 @@ Example:
 }
 ```
 
-For group conversations, use `groupPolicy` and `groupAllowFrom`.
+Для групповых бесед используются `groupPolicy` и `groupAllowFrom`.
 
-### Per-conversation settings
+### Настройки отдельных бесед
 
-Individual group conversations can have their own settings:
+Для отдельных групповых бесед можно задать собственные параметры:
 
 ```json
 {
@@ -143,9 +143,9 @@ Individual group conversations can have their own settings:
 }
 ```
 
-### Multiple VK communities
+### Несколько сообществ ВКонтакте
 
-Multiple VK community tokens can be configured as separate accounts:
+Можно настроить несколько токенов сообществ как отдельные аккаунты:
 
 ```json
 {
@@ -169,16 +169,16 @@ Multiple VK community tokens can be configured as separate accounts:
 }
 ```
 
-## Token security
+## Безопасность токена
 
-A token may be supplied through:
+Токен можно передать через:
 
 - `token`
 - `tokenFile`
 - `VK_TOKEN`
-- an OpenClaw SecretRef
+- OpenClaw SecretRef
 
-Example SecretRef:
+Пример SecretRef:
 
 ```json
 {
@@ -194,96 +194,96 @@ Example SecretRef:
 }
 ```
 
-For production installations, prefer a secret provider or a protected token file instead of storing credentials directly in the OpenClaw configuration.
+Для production-установок рекомендуется использовать провайдер секретов или защищённый файл с токеном вместо хранения учётных данных непосредственно в конфигурации OpenClaw.
 
-## Media
+## Медиафайлы
 
-The channel supports outgoing:
+Канал поддерживает отправку:
 
-- images
-- documents
-- audio
-- voice messages
+- изображений;
+- документов;
+- аудио;
+- голосовых сообщений.
 
-VK community tokens need the corresponding `photos` and `docs` permissions for these operations.
+Для этих операций токену сообщества нужны соответствующие разрешения на работу с `photos` и `docs`.
 
-If an image URL cannot be downloaded directly by VK, the channel can fall back to downloading the media through the OpenClaw host and uploading it to VK.
+Если VK не может напрямую скачать изображение по URL, канал может скачать файл через хост OpenClaw и затем загрузить его в VK.
 
-## Formatting
+## Форматирование
 
-OpenClaw responses can use Markdown-style formatting supported by VK's `format_data`, including:
+Ответы OpenClaw могут использовать Markdown-подобное форматирование, поддерживаемое VK через `format_data`:
 
-- **bold**
-- *italic*
-- ***bold italic***
-- [links](https://example.com)
+- **жирный текст**
+- *курсив*
+- ***жирный курсив***
+- [ссылки](https://example.com)
 
-Unsupported Markdown is sent as ordinary text.
+Неподдерживаемый Markdown отправляется как обычный текст.
 
-## Development
+## Разработка
 
-Install dependencies:
+Установите зависимости:
 
 ```bash
 npm install
 ```
 
-Build:
+Сборка:
 
 ```bash
 npm run build
 ```
 
-Run tests:
+Запуск тестов:
 
 ```bash
 npm test
 ```
 
-Type checking and project-specific validation should be run before publishing changes.
+Перед публикацией изменений рекомендуется выполнять проверку типов и предусмотренные проектом проверки.
 
-## Troubleshooting
+## Диагностика
 
-Check the channel:
+Проверить состояние канала:
 
 ```bash
 openclaw channels status --json --probe
 ```
 
-Check plugin information:
+Проверить информацию о плагине:
 
 ```bash
 openclaw plugins info vk --json
 ```
 
-If the channel is configured but not running, inspect the OpenClaw gateway logs and verify:
+Если канал настроен, но не запускается, проверьте логи Gateway OpenClaw и убедитесь, что:
 
-1. the VK token is valid;
-2. Bots Long Poll API is enabled;
-3. required VK event types are enabled;
-4. the plugin is enabled;
-5. the configured access policy allows the sender;
-6. the gateway has been restarted after relevant configuration changes.
+1. токен VK действителен;
+2. Bots Long Poll API включён;
+3. необходимые события VK включены;
+4. плагин включён;
+5. настроенная политика доступа разрешает сообщения от отправителя;
+6. после соответствующих изменений конфигурации был перезапущен Gateway.
 
-For media errors involving access scopes, recreate the community token with the required VK permissions and restart the OpenClaw gateway.
+При ошибках, связанных с доступом к медиафайлам, создайте токен сообщества заново с необходимыми разрешениями VK и перезапустите Gateway OpenClaw.
 
-## Roadmap
+## План развития
 
-The repository is intended to evolve beyond basic VK message transport.
+Репозиторий будет развиваться дальше базовой передачи сообщений VK.
 
-Planned work includes:
+В планах:
 
-- processing comments on VK wall posts;
-- processing comments on VK Clips;
-- passing post/clip context to the OpenClaw agent;
-- AI-assisted comment analysis;
-- configurable automatic replies;
-- comment deduplication and loop protection;
-- moderation and filtering rules;
-- rate limiting for automated replies.
+- обработка комментариев к записям на стене ВКонтакте;
+- обработка комментариев к VK Клипа́м;
+- передача агенту OpenClaw контекста записи или клипа;
+- AI-анализ комментариев;
+- настраиваемые автоматические ответы;
+- защита от дублирования комментариев и зацикливания ответов;
+- правила модерации и фильтрации;
+- ограничение частоты автоматических ответов.
 
-These features will be implemented directly in this project rather than depending on the architecture of the original upstream implementation.
+Эти возможности будут реализовываться непосредственно в этом проекте, без зависимости от архитектуры исходной реализации.
 
-## License
+## Лицензия
 
-See [LICENSE](LICENSE).
+См. файл [LICENSE](LICENSE).
