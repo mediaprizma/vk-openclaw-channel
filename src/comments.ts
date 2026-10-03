@@ -58,6 +58,131 @@ function normalizePostAttachments(raw: unknown): VkInboundAttachment[] {
   return extractVkInboundAttachments(raw);
 }
 
+function decodeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function isVkPhotoUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "vkuserphoto.ru" || url.hostname.endsWith(".vkuserphoto.ru"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function collectVkPublicImageUrls(html: string): string[] {
+  const urls = new Set<string>();
+
+  const add = (raw: string | undefined) => {
+    if (!raw) return;
+    const url = decodeHtmlAttribute(raw.trim());
+    if (isVkPhotoUrl(url)) urls.add(url);
+  };
+
+  // VK's public photo viewer exposes the actual post image through this stable
+  // test id. Prefer it over generic vkuserphoto URLs because the page also
+  // contains avatars, icons and other UI images.
+  const pvPhotoRegex =
+    /<img\b[^>]*data-testid=["']pv_photo_image["'][^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+  const pvPhotoRegexReversed =
+    /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*data-testid=["']pv_photo_image["'][^>]*>/gi;
+
+  for (const match of html.matchAll(pvPhotoRegex)) add(match[1]);
+  for (const match of html.matchAll(pvPhotoRegexReversed)) add(match[1]);
+
+  // Fallback for public pages where VK does not render the photo-viewer node.
+  const ogImageRegex =
+    /<meta\b[^>]*(?:property|name)=["']og:image["'][^>]*\bcontent=["']([^"']+)["'][^>]*>/gi;
+  const ogImageRegexReversed =
+    /<meta\b[^>]*\bcontent=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["'][^>]*>/gi;
+
+  for (const match of html.matchAll(ogImageRegex)) add(match[1]);
+  for (const match of html.matchAll(ogImageRegexReversed)) add(match[1]);
+
+  return [...urls];
+}
+
+function extractVkPublicMeta(html: string, key: "og:description" | "og:title"): string | undefined {
+  const escapedKey = key.replace(":", "\\:");
+  const patterns = [
+    new RegExp(
+      `<meta\\\\b[^>]*(?:property|name)=["']${escapedKey}["'][^>]*\\\\bcontent=["']([^"']*)["'][^>]*>`,
+      "i",
+    ),
+    new RegExp(
+      `<meta\\\\b[^>]*\\\\bcontent=["']([^"']*)["'][^>]*(?:property|name)=["']${escapedKey}["'][^>]*>`,
+      "i",
+    ),
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      const value = decodeHtmlAttribute(match[1]).trim();
+      if (value) return value;
+    }
+  }
+  return undefined;
+}
+
+async function fetchVkPublicWallPost(postUrl: string): Promise<{
+  media: VkInboundAttachment[];
+  text?: string;
+}> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  try {
+    const response = await fetch(postUrl, {
+      method: "GET",
+      headers: {
+        accept: "text/html,application/xhtml+xml",
+        "accept-language": "ru-RU,ru;q=0.9,en;q=0.8",
+        "user-agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+          "(KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+      },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`VK public page returned HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    if (html.length > 8_000_000) {
+      throw new Error("VK public page is unexpectedly large");
+    }
+
+    const media = collectVkPublicImageUrls(html).map((url, index) => ({
+      type: "photo",
+      kind: "image",
+      url,
+      mimeType: "image/jpeg",
+      title: `VK wall photo ${index + 1}`,
+      fromPost: true,
+    }));
+
+    return {
+      media,
+      text: extractVkPublicMeta(html, "og:description"),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function isVkCommentEventType(value: string): value is VkCommentEventType {
   return value === "post_comment" || value === "clip_comment" || value === "video_comment";
 }
@@ -79,6 +204,7 @@ export async function resolveVkWallComment(
     return null;
   }
 
+  const postUrl = buildPostUrl(ownerId, postId);
   let post: Record<string, unknown> | undefined;
   try {
     const response = await vk.api.wall.getById({
@@ -89,7 +215,17 @@ export async function resolveVkWallComment(
       : [];
     post = asRecord(items[0]);
   } catch {
-    post = undefined;
+    // Community tokens cannot call wall.getById (VK error 27). The public
+    // wall page is the supported fallback for the media needed by the agent.
+  }
+
+  let publicPost: Awaited<ReturnType<typeof fetchVkPublicWallPost>> | undefined;
+  if (!post) {
+    try {
+      publicPost = await fetchVkPublicWallPost(postUrl);
+    } catch {
+      publicPost = undefined;
+    }
   }
 
   const postType = readString(post?.postType) ?? readString(post?.post_type);
@@ -97,16 +233,17 @@ export async function resolveVkWallComment(
   const eventType: VkCommentEventType = sourceType === "clip" ? "clip_comment" : "post_comment";
 
   const postAttachments = normalizePostAttachments(post?.attachments);
-  const postMedia = postAttachments.filter((attachment) =>
+  const apiPostMedia = postAttachments.filter((attachment) =>
     attachment.kind === "image" || attachment.kind === "video",
   );
+  const postMedia = apiPostMedia.length > 0 ? apiPostMedia : (publicPost?.media ?? []);
 
   const origin: VkPostOrigin = {
     type: sourceType,
     ownerId,
     id: postId,
-    url: buildPostUrl(ownerId, postId),
-    text: readString(post?.text),
+    url: postUrl,
+    text: readString(post?.text) ?? publicPost?.text,
     media: postMedia,
   };
 
