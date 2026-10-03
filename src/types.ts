@@ -31,7 +31,7 @@ export type VkCommentSource = {
 export type VkPostOrigin = VkCommentSource;
 
 export type VkCommentReplyRoute = {
-  type: "post_comment" | "clip_comment";
+  type: "post_comment" | "clip_comment" | "video_comment";
   ownerId: number;
   contentId: number;
   commentId: number;
