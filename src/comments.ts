@@ -174,7 +174,7 @@ async function fetchVkPublicWallPost(postUrl: string, logError?: (line: string) 
 
         const html = await response.text();
         logError?.(
-          `vk: public post response status=${response.status} finalUrl=${response.url} htmlBytes=${Buffer.byteLength(html, "utf8")} contentType=${response.headers.get("content-type") ?? "unknown"}`,
+          `vk: public post response status=${response.status} finalUrl=${response.url} htmlBytes=${Buffer.byteLength(html, "utf8")} contentType=${response.headers?.get?.("content-type") ?? "unknown"}`,
         );
 
         if (!response.ok) {
