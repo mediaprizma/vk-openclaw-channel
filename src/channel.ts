@@ -255,7 +255,28 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
     blockStreaming: true,
   },
   reload: { configPrefixes: ["channels.vk-openclaw-channel"] },
-  configSchema: buildChannelConfigSchema(VkConfigSchema),
+  configSchema: buildChannelConfigSchema(VkConfigSchema, {
+    uiHints: {
+      systemPrompt: {
+        label: "System prompt",
+        help: "Trusted instructions injected into every VK turn. A group-specific systemPrompt is appended after this channel/account prompt.",
+        placeholder: "Instructions for the VK agent…",
+        advanced: false,
+      },
+      "accounts.*.systemPrompt": {
+        label: "Account system prompt",
+        help: "Trusted instructions for this VK account. Group-specific instructions are appended after it.",
+        placeholder: "Instructions for this VK account…",
+        advanced: false,
+      },
+      "groups.*.systemPrompt": {
+        label: "Group system prompt",
+        help: "Additional trusted instructions for this VK group.",
+        placeholder: "Instructions for this VK group…",
+        advanced: true,
+      },
+    },
+  }),
   secrets: {
     secretTargetRegistryEntries,
     collectRuntimeConfigAssignments,
