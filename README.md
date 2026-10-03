@@ -70,7 +70,7 @@ openclaw plugins install --link ./dist/index.js
 После установки проверьте плагин:
 
 ```bash
-openclaw plugins info vk --json
+openclaw plugins info vk-openclaw-channel --json
 openclaw channels status --json --probe
 ```
 
@@ -253,7 +253,7 @@ openclaw channels status --json --probe
 Проверить информацию о плагине:
 
 ```bash
-openclaw plugins info vk --json
+openclaw plugins info vk-openclaw-channel --json
 ```
 
 Если канал настроен, но не запускается, проверьте логи Gateway OpenClaw и убедитесь, что:
