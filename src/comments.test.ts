@@ -113,6 +113,60 @@ describe("VK comments", () => {
     );
   });
 
+  it("extracts embedded VK source image URLs from the ordinary wall page", async () => {
+    mockVk.api.wall.getById.mockRejectedValueOnce(new Error("VK error 27"));
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () =>
+        '<div data-json="{&quot;photo&quot;:&quot;https:\/\/sun9-48.vkuserphoto.ru\/s\/v1\/ig2\/abc.jpg?quality=95&amp;crop=0,0,1961,1593&amp;as=32x26,1961x1593&quot;}">' +
+        '<img src="https://sun9-48.vkuserphoto.ru/avatar.jpg?size=73x73">',
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await resolveVkWallComment(mockVk as never, {
+      id: 45,
+      owner_id: -80752341,
+      post_id: 515,
+      from_id: 123,
+      text: "что на фото?",
+      date: 1700000000,
+    });
+
+    expect(result?.origin.media).toEqual([
+      expect.objectContaining({
+        kind: "image",
+        url: "https://sun9-48.vkuserphoto.ru/s/v1/ig2/abc.jpg?quality=95&crop=0,0,1961,1593&as=32x26,1961x1593",
+        fromPost: true,
+      }),
+    ]);
+  });
+
+  it("uses the public page when the VK API returns a partial post without media", async () => {
+    mockVk.api.wall.getById.mockResolvedValueOnce({
+      items: [{ post_type: "post", text: "Пост без вложений в API", attachments: [] }],
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () =>
+        '<meta property="og:image" content="https://sun9-48.vkuserphoto.ru/s/v1/ig2/abc.jpg?crop=0,0,1200,900">',
+    })));
+
+    const result = await resolveVkWallComment(mockVk as never, {
+      id: 46,
+      owner_id: -80752341,
+      post_id: 515,
+      from_id: 123,
+      text: "покажи",
+      date: 1700000000,
+    });
+
+    expect(result?.origin.text).toBe("Пост без вложений в API");
+    expect(result?.origin.media).toHaveLength(1);
+    expect(result?.origin.media[0]?.url).toContain("/s/v1/ig2/abc.jpg");
+  });
+
   it("falls back safely when both VK API and public page are unavailable", async () => {
     mockVk.api.wall.getById.mockRejectedValueOnce(new Error("VK error 27"));
     vi.stubGlobal("fetch", vi.fn(async () => {
