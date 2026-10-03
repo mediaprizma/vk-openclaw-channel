@@ -353,7 +353,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     };
 
     core.channel.activity.record({
-      channel: "vk",
+      channel: "vk-openclaw-channel",
       accountId: account.accountId,
       direction: "inbound",
       at: message.timestamp,
