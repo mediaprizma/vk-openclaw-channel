@@ -125,6 +125,16 @@ const VkSecretInputSchema = z.union([
   ]),
 ]);
 
+const VkCommentsSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    postComments: z.boolean().optional(),
+    clipComments: z.boolean().optional(),
+    videoComments: z.boolean().optional(),
+  })
+  .strict()
+  .optional();
+
 const VkAccountSchemaBase = z
   .object({
     name: z.string().optional(),
@@ -138,6 +148,7 @@ const VkAccountSchemaBase = z
     groupPolicy: GroupPolicySchema.optional(),
     groupAllowFrom: z.array(z.union([z.string(), z.number()])).optional(),
     contextVisibility: z.enum(VK_CONTEXT_VISIBILITY_MODES).optional(),
+    comments: VkCommentsSchema,
     groups: z.record(z.string(), VkGroupConfigSchema).optional(),
   })
   .strict();
