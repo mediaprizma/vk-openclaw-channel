@@ -347,6 +347,6 @@
       }
     }
   },
-  "name": "VK Channel",
+  "name": "VK OpenClaw Channel",
   "description": "Канал OpenClaw для сообществ ВКонтакте через Bots Long Poll API."
 }
