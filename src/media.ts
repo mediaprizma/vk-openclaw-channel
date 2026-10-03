@@ -673,7 +673,7 @@ function buildVkInboundMediaFileHint(attachment: VkInboundAttachment): string {
 
 export async function resolveVkInboundResolvedMedia(params: {
   attachments?: readonly VkInboundAttachment[];
-  mediaRuntime?: Pick<PluginRuntime["channel"]["media"], "fetchRemoteMedia" | "saveMediaBuffer">;
+  mediaRuntime?: Pick<PluginRuntime["channel"]["media"], "saveRemoteMedia">;
   maxBytes?: number;
   logError?: (line: string) => void;
 }): Promise<VkInboundResolvedMedia[]> {
@@ -700,18 +700,12 @@ export async function resolveVkInboundResolvedMedia(params: {
 
     try {
       const fileHint = buildVkInboundMediaFileHint(attachment);
-      const fetched = await params.mediaRuntime.fetchRemoteMedia({
+      const saved = await params.mediaRuntime.saveRemoteMedia({
         url,
+        subdir: "inbound",
+        maxBytes,
         filePathHint: fileHint,
-        maxBytes,
       });
-      const saved = await params.mediaRuntime.saveMediaBuffer(
-        Buffer.from(fetched.buffer),
-        fetched.contentType ?? attachment.mimeType,
-        "inbound",
-        maxBytes,
-        fileHint,
-      );
       out.push({
         path: saved.path,
         url,
