@@ -85,7 +85,7 @@ function collectVkPublicImageUrls(html: string): string[] {
 
   const add = (raw: string | undefined) => {
     if (!raw) return;
-    const url = decodeHtmlAttribute(raw.trim()).replace(/[\\\\}\],;]+$/g, "");
+    const url = decodeHtmlAttribute(raw.trim()).replace(/[\\\\\"}\],;]+$/g, "");
     if (isVkPhotoUrl(url)) urls.add(url);
   };
 
