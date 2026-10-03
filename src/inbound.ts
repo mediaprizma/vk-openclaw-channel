@@ -630,7 +630,7 @@ export async function handleVkInbound(params: {
   const removeAckAfterReply =
     (cfgRecord.messages?.removeAckAfterReply as boolean | undefined) ?? false;
 
-  // ── Step-progress draft (opt-in via channels.vk-openclaw-channel-openclaw-channel.streaming.mode:"progress") ──
+  // ── Step-progress draft (opt-in via channels.vk-openclaw-channel.streaming.mode:"progress") ──
   // Shows the live list of execution steps (🛠️ tool calls, 🔎 web search …) in
   // ONE message edited in place, mirroring Telegram's "progress" stream. It is
   // INDEPENDENT of status reactions — both can run together (as Telegram does):
