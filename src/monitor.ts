@@ -2,7 +2,6 @@ import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
 import type { ChannelAccountSnapshot } from "openclaw/plugin-sdk/channel-contract";
 import { channelReadyPatch, channelStoppedPatch } from "openclaw/plugin-sdk/gateway-runtime";
 import { parseStrictPositiveInteger } from "openclaw/plugin-sdk/core";
-import { globalAgent } from "node:https";
 import { PollingTransport, VK } from "vk-io";
 import { createStallWatchdog, type StallWatchdog } from "./stall-watchdog.js";
 import { resolveVkAccount } from "./accounts.js";
@@ -54,31 +53,36 @@ function resolveTransportSilenceMs(config: VkAccountConfig): number {
   return parseStrictPositiveInteger(config.transport?.silenceMs) ?? DEFAULT_TRANSPORT_SILENCE_MS;
 }
 
-class ReadinessPollingTransport extends PollingTransport {
-  private readinessSettled = false;
-  private readonly firstSuccessfulPoll: Promise<void>;
+class BotsLongPollTransport {
+  private started = false;
+  private ts = "";
+  private serverUrl: URL | undefined;
+  private key = "";
+  private loopPromise: Promise<void> | undefined;
+  private firstSuccessfulPoll: Promise<void>;
   private resolveFirstSuccessfulPoll!: () => void;
   private rejectFirstSuccessfulPoll!: (error: Error) => void;
-  private readonly onSuccessfulPoll: () => void;
+  private readinessSettled = false;
+  private readonly api: VK["api"];
+  private readonly groupId: number;
+  private readonly onPollCompleted: () => void;
+  private readonly onUpdate: (update: Record<string, unknown>) => Promise<unknown> | unknown;
 
-  constructor(
-    options: ConstructorParameters<typeof PollingTransport>[0],
-    onSuccessfulPoll: () => void,
-  ) {
-    super(options);
-    this.onSuccessfulPoll = onSuccessfulPoll;
+  constructor(params: {
+    api: VK["api"];
+    groupId: number;
+    onPollCompleted: () => void;
+    onUpdate: (update: Record<string, unknown>) => Promise<unknown> | unknown;
+  }) {
+    this.api = params.api;
+    this.groupId = params.groupId;
+    this.onPollCompleted = params.onPollCompleted;
+    this.onUpdate = params.onUpdate;
     this.firstSuccessfulPoll = new Promise<void>((resolve, reject) => {
       this.resolveFirstSuccessfulPoll = resolve;
       this.rejectFirstSuccessfulPoll = reject;
     });
     void this.firstSuccessfulPoll.catch(() => {});
-  }
-
-  waitForFirstSuccessfulPoll(timeoutMs = FIRST_LONG_POLL_CHECK_TIMEOUT_MS): Promise<void> {
-    const timeout = setTimeout(() => {
-      this.settleReadinessFailure();
-    }, timeoutMs);
-    return this.firstSuccessfulPoll.finally(() => clearTimeout(timeout));
   }
 
   private settleReadinessSuccess(): void {
@@ -93,24 +97,118 @@ class ReadinessPollingTransport extends PollingTransport {
     this.rejectFirstSuccessfulPoll(error);
   }
 
-  override async fetchUpdates(): Promise<void> {
-    try {
-      await super.fetchUpdates();
-      this.settleReadinessSuccess();
-      this.onSuccessfulPoll();
-    } catch (error) {
-      if (!this.readinessSettled) {
-        this.settleReadinessFailure(
-          error instanceof Error ? error : new Error(FIRST_LONG_POLL_CHECK_ERROR),
-        );
+  waitForFirstSuccessfulPoll(timeoutMs = FIRST_LONG_POLL_CHECK_TIMEOUT_MS): Promise<void> {
+    const timeout = setTimeout(() => this.settleReadinessFailure(), timeoutMs);
+    return this.firstSuccessfulPoll.finally(() => clearTimeout(timeout));
+  }
+
+  async start(): Promise<void> {
+    if (this.started) throw new Error("VK Bots Long Poll already started");
+
+    const response = await this.api.groups.getLongPollServer({
+      group_id: this.groupId,
+    });
+    const data = response as { server?: string; key?: string; ts?: string | number };
+    if (!data.server || !data.key || data.ts === undefined) {
+      throw new Error("VK groups.getLongPollServer returned an incomplete response");
+    }
+
+    this.serverUrl = new URL(data.server);
+    this.key = data.key;
+    this.ts = String(data.ts);
+    this.started = true;
+    this.loopPromise = this.runLoop();
+  }
+
+  async stopAndDrain(): Promise<void> {
+    this.started = false;
+    this.settleReadinessFailure(new Error("VK Bots Long Poll stopped"));
+    await this.loopPromise?.catch(() => {});
+  }
+
+  private async runLoop(): Promise<void> {
+    while (this.started) {
+      try {
+        await this.fetchOnce();
+      } catch (error) {
+        if (!this.started) break;
+        const message = error instanceof Error ? error.message : String(error);
+        // A Long Poll server error requires a fresh server/key/ts.
+        try {
+          const response = await this.api.groups.getLongPollServer({
+            group_id: this.groupId,
+          });
+          const data = response as { server?: string; key?: string; ts?: string | number };
+          if (!data.server || !data.key || data.ts === undefined) {
+            throw new Error("VK groups.getLongPollServer returned an incomplete response");
+          }
+          this.serverUrl = new URL(data.server);
+          this.key = data.key;
+          this.ts = String(data.ts);
+        } catch (refreshError) {
+          const refreshMessage =
+            refreshError instanceof Error ? refreshError.message : String(refreshError);
+          throw new Error(`VK Bots Long Poll restart failed: ${refreshMessage}; original: ${message}`);
+        }
+        await new Promise<void>((resolve) => setTimeout(resolve, 1000));
       }
-      throw error;
     }
   }
 
-  override async stop(): Promise<void> {
-    this.settleReadinessFailure();
-    await super.stop();
+  private async fetchOnce(): Promise<void> {
+    if (!this.serverUrl) throw new Error("VK Bots Long Poll server is not initialized");
+
+    const url = new URL(this.serverUrl);
+    url.search = new URLSearchParams({
+      act: "a_check",
+      key: this.key,
+      ts: this.ts,
+      wait: "25",
+      mode: "202",
+      version: "19",
+    }).toString();
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+
+    let result:
+      | { ts: string | number; updates?: unknown[] }
+      | { failed: 1; ts: string | number }
+      | { failed: 2; error?: string }
+      | { failed: 3; ts?: string | number; failed?: number }
+      | { failed: 4; min_version?: number; max_version?: number };
+
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        signal: controller.signal,
+        headers: { connection: "keep-alive" },
+      });
+      if (!response.ok) {
+        throw new Error(`VK Long Poll HTTP ${response.status}`);
+      }
+      result = (await response.json()) as typeof result;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if ("failed" in result) {
+      if (result.failed === 1 && "ts" in result) {
+        this.ts = String(result.ts);
+        this.onPollCompleted();
+        return;
+      }
+      throw new Error(`VK Long Poll failed=${result.failed}${"error" in result && result.error ? ` ${result.error}` : ""}`);
+    }
+
+    this.ts = String(result.ts);
+    this.settleReadinessSuccess();
+    this.onPollCompleted();
+
+    for (const update of result.updates ?? []) {
+      if (!update || typeof update !== "object" || Array.isArray(update)) continue;
+      await this.onUpdate(update as Record<string, unknown>);
+    }
   }
 }
 
@@ -257,7 +355,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
   let stopRequested = false;
   let updatesStarted = false;
   let stopPromise: Promise<void> | undefined;
-  let pollingTransport: ReadinessPollingTransport | undefined;
+  let pollingTransport: { stopAndDrain(): Promise<void>; waitForFirstSuccessfulPoll(): Promise<void> } | undefined;
   let publishPollActivity = false;
   // Declared here so `finally` can reach it: the watchdog owns a timer, and a
   // start that fails before the watchdog is armed must still release it.
@@ -477,43 +575,36 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       },
     });
 
-    pollingTransport = new ReadinessPollingTransport(
-      {
-        api: vk.api,
-        agent: globalAgent,
-        pollingWait: 3_000,
-        pollingRetryLimit: 3,
-        ...(useBotsLongPoll ? { pollingGroupId: botsLp.groupId } : {}),
-      },
-      () => {
-        stallWatchdog?.touch();
-        if (publishPollActivity) {
-          opts.setStatus?.({ lastTransportActivityAt: Date.now() });
-        }
-      },
-    );
-    pollingTransport.subscribe((update) => {
-      if (useBotsLongPoll) {
-        const eventType =
-          typeof update === "object" && update !== null && "type" in update
-            ? String((update as Record<string, unknown>).type)
-            : typeof update;
-        opts.runtime.log?.(`[${opts.accountId}] VK Long Poll update: ${eventType}`);
-        return vk.updates.handleWebhookUpdate(
-          update as unknown as Record<string, unknown>,
-        );
-      }
-      return vk.updates.handlePollingUpdate(update);
-    });
-
     if (useBotsLongPoll) {
-      opts.runtime.log?.(`[${opts.accountId}] using Bots Long Poll (group ${botsLp.groupId})`);
+      pollingTransport = new BotsLongPollTransport({
+        api: vk.api,
+        groupId: botsLp.groupId,
+        onPollCompleted: () => {
+          stallWatchdog?.touch();
+          if (publishPollActivity) {
+            opts.setStatus?.({ lastTransportActivityAt: Date.now() });
+          }
+        },
+        onUpdate: async (update) => {
+          const eventType = typeof update.type === "string" ? update.type : "unknown";
+          opts.runtime.log?.(`[${opts.accountId}] VK Long Poll update: ${eventType}`);
+          await vk.updates.handleWebhookUpdate(update);
+        },
+      });
+      opts.runtime.log?.(`[${opts.accountId}] using native VK Bots Long Poll fetch loop (group ${botsLp.groupId})`);
       await pollingTransport.start();
     } else {
+      const userPolling = new PollingTransport({
+        api: vk.api,
+        pollingWait: 3_000,
+        pollingRetryLimit: 3,
+      });
+      userPolling.subscribe((update) => vk.updates.handlePollingUpdate(update));
+      pollingTransport = userPolling as typeof pollingTransport;
       opts.runtime.log?.(
         `[${opts.accountId}] Bots Long Poll unavailable, falling back to User Long Poll`,
       );
-      await pollingTransport.start();
+      await userPolling.start();
     }
     updatesStarted = true;
 
