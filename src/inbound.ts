@@ -350,7 +350,7 @@ export async function handleVkInbound(params: {
 
   // Command gating
   const allowTextCommands = core.channel.commands.shouldHandleTextCommands({
-    cfg: config as OpenClawConfig,
+    cfg: ({ ...(config as OpenClawConfig), session: { ...((config as OpenClawConfig).session ?? {}), dmScope: "per-account-channel-peer" } } as OpenClawConfig),
     surface: CHANNEL_ID,
   });
   const useAccessGroups = (config as Record<string, unknown>).commands
