@@ -7,7 +7,7 @@ import type { ResolvedVkAccount, VkAccountConfig, VkConfig, CoreConfig } from ".
 export type { ResolvedVkAccount } from "./types.js";
 
 function mergeVkAccountConfig(cfg: CoreConfig, accountId: string): VkAccountConfig {
-  const vkConfig = (cfg.channels?.vk ?? {}) as VkConfig;
+  const vkConfig = (cfg.channels?.["vk-openclaw-channel"] ?? {}) as VkConfig;
   const base: VkAccountConfig = {
     name: vkConfig.name,
     enabled: vkConfig.enabled,
@@ -131,7 +131,7 @@ export function resolveVkAccount(params: {
 }
 
 export function listVkAccountIds(cfg: CoreConfig): string[] {
-  const vkConfig = cfg.channels?.vk as VkConfig | undefined;
+  const vkConfig = cfg.channels?.["vk-openclaw-channel"] as VkConfig | undefined;
   if (!vkConfig) {
     return [];
   }
