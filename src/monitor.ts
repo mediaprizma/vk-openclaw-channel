@@ -249,6 +249,34 @@ async function canUseBotsLongPoll(
   }
 }
 
+async function ensureVkCommentLongPollEvents(
+  vk: VK,
+  groupId: number,
+  account: VkAccountConfig,
+): Promise<void> {
+  const comments = account.comments;
+  const postComments = comments?.enabled !== false && comments?.postComments !== false;
+  const clipComments = comments?.enabled !== false && comments?.clipComments !== false;
+  const videoComments = comments?.enabled === true && comments?.videoComments === true;
+
+  if (!postComments && !clipComments && !videoComments) {
+    return;
+  }
+
+  try {
+    await vk.api.groups.setLongPollSettings({
+      group_id: groupId,
+      enabled: 1,
+      api_version: "5.199",
+      ...(postComments ? { wall_reply_new: 1 } : {}),
+      ...(clipComments || videoComments ? { video_comment_new: 1 } : {}),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`failed to enable VK Long Poll comment events: ${message}`);
+  }
+}
+
 function isVkCommentEnabled(account: VkAccountConfig, kind: "post" | "clip" | "video"): boolean {
   const comments = account.comments;
   if (comments?.enabled === false) return false;
@@ -519,6 +547,13 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       primeVkGroupId(opts.token, botsLp.groupId, botsLp.groupName);
     }
     const useBotsLongPoll = botsLp.ok && botsLp.groupId !== undefined;
+
+    if (useBotsLongPoll) {
+      await ensureVkCommentLongPollEvents(vk, botsLp.groupId, account);
+      opts.runtime.log?.(
+        `[${opts.accountId}] VK Long Poll comment events enabled: wall_reply_new, video_comment_new`,
+      );
+    }
     // The only honest liveness signal is "a poll request came back". The cursor
     // is not one: it moves on EVENTS, so it sits still for hours on a quiet
     // channel; and `isStarted` stays true on a wedged transport.
