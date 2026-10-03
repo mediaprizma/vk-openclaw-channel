@@ -72,11 +72,11 @@ function snackbarText(text: string): string {
 async function readVkDmStoreAllowFrom(accountId: string, dmPolicy: string): Promise<string[]> {
   const pairing = createChannelPairingController({
     core: getVkRuntime(),
-    channel: "vk",
+    channel: "vk-openclaw-channel",
     accountId,
   });
   return await readStoreAllowFromForDmPolicy({
-    provider: "vk",
+    provider: "vk-openclaw-channel",
     accountId,
     dmPolicy: dmPolicy as never,
     readStore: pairing.readStoreForDmPolicy,
