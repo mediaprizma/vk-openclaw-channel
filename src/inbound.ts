@@ -32,6 +32,7 @@ import {
 } from "openclaw/plugin-sdk/runtime-group-policy";
 import { evaluateSupplementalContextVisibility } from "openclaw/plugin-sdk/security-runtime";
 import { redactVkErrorText, redactVkId, vkDiag } from "./diagnostics.js";
+import { formatVkCommentContext, sendVkCommentReply } from "./comments.js";
 import { renderVkMarkdownChunks } from "./format.js";
 import { resolveVkButtonsFromPayload, resolveVkCommandFromPayload } from "./keyboard.js";
 import {
@@ -188,6 +189,11 @@ export async function handleVkInbound(params: {
 }): Promise<void> {
   const { message, account, config, runtime, statusSink } = params;
   const core = getVkRuntime();
+  const isComment = Boolean(message.comment);
+  if (isComment && account.config.comments?.enabled === false) {
+    runtime.log?.(`vk: drop comment ${redactVkId(message.messageId)} (comments disabled)`);
+    return;
+  }
   const pairing = createChannelPairingController({
     core,
     channel: CHANNEL_ID,
@@ -273,14 +279,15 @@ export async function handleVkInbound(params: {
   const visibleForwards = filterVkForwards(message.forwards, isForwardVisible);
   const firstForward = visibleForwards[0];
   const envelopeOptions = core.channel.reply.resolveEnvelopeFormatOptions(config as OpenClawConfig);
-  const rawBody =
-    payloadCommand ??
-    resolveVkInboundAgentText({
-      text: message.text,
-      attachments: message.attachments,
-      forwards: visibleForwards,
-      envelope: envelopeOptions,
-    });
+  const rawBody = message.comment
+    ? formatVkCommentContext(message.comment)
+    : payloadCommand ??
+      resolveVkInboundAgentText({
+        text: message.text,
+        attachments: message.attachments,
+        forwards: visibleForwards,
+        envelope: envelopeOptions,
+      });
   if (!rawBody) {
     // Only reachable when every forward was hidden: the empty-message check above
     // already let this one through. Say so, without naming the hidden authors.
@@ -290,8 +297,11 @@ export async function handleVkInbound(params: {
     return;
   }
 
-  // Group access and sender authorization
-  if (isGroup) {
+  // Group access and sender authorization. Public VK comments are already
+  // authenticated by VK as events on this community wall/video, so they do not
+  // inherit the private-DM pairing gate. Their agent session is still keyed to
+  // the same canonical VK sender id as a DM.
+  if (!isComment && isGroup) {
     const admission = resolveVkGroupSenderAdmission(groupAccess, message.senderId);
     if ("reason" in admission) {
       runtime.log?.(
@@ -303,7 +313,7 @@ export async function handleVkInbound(params: {
       );
       return;
     }
-  } else {
+  } else if (!isComment) {
     if (dmPolicy === "disabled") {
       runtime.log?.(`vk: drop DM sender=${redactVkId(message.senderId)} (dmPolicy=disabled)`);
       return;
@@ -438,7 +448,11 @@ export async function handleVkInbound(params: {
     },
   });
 
-  const fromLabel = isGroup ? `vk:chat:${message.peerId}` : `vk:${message.senderId}`;
+  const fromLabel = message.comment
+    ? `vk:comment:${message.comment.eventType}:${message.senderId}`
+    : isGroup
+      ? `vk:chat:${message.peerId}`
+      : `vk:${message.senderId}`;
   const storePath = core.channel.session.resolveStorePath(
     (config as Record<string, Record<string, unknown>>).session?.store as string | undefined,
     {
@@ -512,7 +526,9 @@ export async function handleVkInbound(params: {
     MessageSid: message.messageId,
     Timestamp: message.timestamp,
     OriginatingChannel: CHANNEL_ID,
-    OriginatingTo: `vk:${peerId}`,
+    OriginatingTo: message.comment
+      ? `vk:comment:${message.comment.eventType}:${message.comment.commentId}`
+      : `vk:${peerId}`,
     CommandAuthorized: commandGate.commandAuthorized,
     media: media.length > 0 ? media : undefined,
     ...(isQuoteVisible && {
@@ -555,7 +571,9 @@ export async function handleVkInbound(params: {
   };
   const typingCallbacks = createTypingCallbacks({
     start: async () => {
-      await sendTypingVk(String(message.peerId), account);
+      if (!isComment) {
+        await sendTypingVk(String(message.peerId), account);
+      }
     },
     onStartError: (err) => {
       logTypingFailure({
@@ -590,12 +608,14 @@ export async function handleVkInbound(params: {
     },
   });
 
-  try {
-    await markMessageReadVk(String(message.peerId), message.messageId, account);
-  } catch (err) {
+  if (!isComment) {
+    try {
+      await markMessageReadVk(String(message.peerId), message.messageId, account);
+    } catch (err) {
     runtime.log?.(
       `vk: mark read failed for peerId=${redactVkId(message.peerId)} messageId=${redactVkId(message.messageId)}: ${String(err)}`,
     );
+  }
   }
 
   const cfgRecord = config as Record<string, Record<string, unknown>>;
@@ -639,11 +659,12 @@ export async function handleVkInbound(params: {
   const vkStreamingEntry = cfgRecord.channels?.["vk-openclaw-channel"] as StreamingCompatEntry | undefined;
   const progressStreamMode = resolveChannelPreviewStreamMode(vkStreamingEntry, "off");
   const progressDraftEnabled =
+    !isComment &&
     progressStreamMode === "progress" &&
     typeof message.conversationMessageId === "number";
 
   let statusReactions: StatusReactionController | null = null;
-  if (statusReactionsEnabled && typeof message.conversationMessageId === "number") {
+  if (!isComment && statusReactionsEnabled && typeof message.conversationMessageId === "number") {
     statusReactions = createVkStatusReactionController({
       peerId: message.peerId,
       cmid: message.conversationMessageId,
@@ -803,11 +824,13 @@ export async function handleVkInbound(params: {
             payload && typeof payload === "object" && !Array.isArray(payload)
               ? (payload as VkDispatchPayload)
               : {};
-          const replyToId = payloadCommand
-            ? (normalized.replyToId ?? message.messageId)
-            : isGroup
-              ? message.messageId
-              : undefined;
+          const replyToId = isComment
+            ? undefined
+            : payloadCommand
+              ? (normalized.replyToId ?? message.messageId)
+              : isGroup
+                ? message.messageId
+                : undefined;
           const outboundPayload: VkDispatchPayload = {
             ...normalized,
             ...(replyToId ? { replyToId } : {}),
@@ -815,6 +838,21 @@ export async function handleVkInbound(params: {
           if (!replyToId) {
             delete outboundPayload.replyToId;
           }
+          if (isComment && normalized.text?.trim()) {
+            try {
+              await sendVkCommentReply({
+                token: account.token,
+                comment: message.comment!,
+                text: normalized.text.trim(),
+                replyToComment: message.comment!.replyToComment ?? message.comment!.commentId,
+              });
+              statusSink?.({ lastOutboundAt: Date.now() });
+            } catch (err) {
+              throw err;
+            }
+            return;
+          }
+
           const resolvedButtons = resolveVkButtonsFromPayload(normalized);
           // A question from the core (ask_user / AskUserQuestion) holds the
           // turn until it is answered, so it must stay a message of its own
