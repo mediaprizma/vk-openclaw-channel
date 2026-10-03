@@ -320,14 +320,28 @@ function normalizeVkAttachmentTitle(type: string, record: Record<string, unknown
 }
 
 function normalizeVkAttachmentUrl(type: string, record: Record<string, unknown>): string | undefined {
+  // wall.getById returns raw VK attachment objects ({type:"photo", photo:{...}}),
+  // while vk-io message contexts expose the media fields directly. Normalize both
+  // shapes so media attached to a source wall post can reach the agent as an image.
+  const nested =
+    type === "photo" || type === "video" || type === "doc" || type === "document"
+      ? asRecord(record[type])
+      : undefined;
+  const media = nested ?? record;
+
   switch (type) {
     case "photo":
       return pickFirstString([
-        readString(record, "largeSizeUrl"),
-        readString(record, "mediumSizeUrl"),
-        readString(record, "smallSizeUrl"),
-        readString(record, "url"),
-        readImageUrlList(record.sizes),
+        readString(media, "largeSizeUrl"),
+        readString(media, "mediumSizeUrl"),
+        readString(media, "smallSizeUrl"),
+        readString(media, "url"),
+        readString(media, "photo_2560"),
+        readString(media, "photo_1280"),
+        readString(media, "photo_807"),
+        readString(media, "photo_604"),
+        readString(media, "photo_130"),
+        readImageUrlList(media.sizes),
       ]);
     case "doc":
     case "document":
@@ -335,8 +349,8 @@ function normalizeVkAttachmentUrl(type: string, record: Record<string, unknown>)
         readPhotoPreviewUrl(record),
         readGraffitiPreviewUrl(record),
         readAudioMessagePreviewUrl(record),
-        readString(record, "url"),
-        readString(record, "previewUrl"),
+        readString(media, "url"),
+        readString(media, "previewUrl"),
       ]);
     case "audio_message":
       return pickFirstString([
