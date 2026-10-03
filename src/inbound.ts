@@ -481,6 +481,15 @@ export async function handleVkInbound(params: {
     mediaRuntime: core.channel.media,
     logError: (line) => runtime.log?.(line),
   });
+  runtime.log?.(
+    `VK inbound media resolved: message=${message.messageId} attachments=${message.attachments?.length ?? 0} resolved=${resolvedMedia.length} paths=${resolvedMedia.filter((entry) => Boolean(entry.path)).length}`,
+  );
+  for (const entry of resolvedMedia) {
+    runtime.log?.(
+      `VK inbound media fact source: kind=${entry.attachment.kind} type=${entry.attachment.type} mime=${entry.contentType ?? entry.attachment.mimeType ?? "unknown"} path=${entry.path ?? "NONE"} url=${entry.url.slice(0, 180)}`,
+    );
+  }
+
   const media = toInboundMediaFacts(
     resolvedMedia.map((entry) => ({
       path: entry.path,
@@ -490,6 +499,9 @@ export async function handleVkInbound(params: {
       kind: resolveVkInboundMediaKind(entry.attachment.kind),
     })),
     { messageId: message.messageId },
+  );
+  runtime.log?.(
+    `VK inbound media facts: message=${message.messageId} count=${media.length} ${media.map((entry) => `${entry.kind}:${entry.path ?? entry.url ?? "NONE"}`).join(" | ")}`,
   );
 
   const replyToSender =
