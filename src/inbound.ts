@@ -68,8 +68,8 @@ import type {
   VkInboundAttachment,
   VkInboundForward,
   VkInboundMessage,
-  buildVkCommentTarget,
 } from "./types.js";
+import { buildVkCommentTarget } from "./types.js";
 
 const CHANNEL_ID = "vk-openclaw-channel" as const;
 
