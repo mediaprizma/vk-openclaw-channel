@@ -592,11 +592,19 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
         }
       },
     );
-    pollingTransport.subscribe((update) =>
-      useBotsLongPoll
-        ? vk.updates.handleWebhookUpdate(update as unknown as Record<string, unknown>)
-        : vk.updates.handlePollingUpdate(update),
-    );
+    pollingTransport.subscribe((update) => {
+      if (useBotsLongPoll) {
+        const eventType =
+          typeof update === "object" && update !== null && "type" in update
+            ? String((update as Record<string, unknown>).type)
+            : typeof update;
+        opts.runtime.log?.(`[${opts.accountId}] VK Long Poll update: ${eventType}`);
+        return vk.updates.handleWebhookUpdate(
+          update as unknown as Record<string, unknown>,
+        );
+      }
+      return vk.updates.handlePollingUpdate(update);
+    });
 
     if (useBotsLongPoll) {
       opts.runtime.log?.(`[${opts.accountId}] using Bots Long Poll (group ${botsLp.groupId})`);
