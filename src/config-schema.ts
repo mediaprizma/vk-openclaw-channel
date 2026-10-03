@@ -148,6 +148,7 @@ const VkAccountSchemaBase = z
     groupPolicy: GroupPolicySchema.optional(),
     groupAllowFrom: z.array(z.union([z.string(), z.number()])).optional(),
     systemPrompt: z.string().optional(),
+    commentPromptTemplate: z.string().optional(),
     contextVisibility: z.enum(VK_CONTEXT_VISIBILITY_MODES).optional(),
     comments: VkCommentsSchema,
     groups: z.record(z.string(), VkGroupConfigSchema).optional(),
