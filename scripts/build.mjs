@@ -9,6 +9,7 @@ const entryPoints = [
   "secret-contract-api.ts",
   "src/accounts.ts",
   "src/channel.setup.ts",
+  "src/comments.ts",
   "src/channel.ts",
   "src/config-schema.ts",
   "src/audio-chunk.ts",
