@@ -16,7 +16,7 @@ import {
   patchVkAccountConfig,
 } from "./setup-core.js";
 
-const channel = "vk" as const;
+const channel = "vk-openclaw-channel" as const;
 
 const VK_SETUP_HELP_LINES = [
   "1) Go to VK community settings > API usage > Access tokens",
@@ -27,7 +27,7 @@ const VK_SETUP_HELP_LINES = [
   "   - docs: send files, TTS audio, and voice messages",
   "3) Enable Bots Long Poll API in community settings",
   "4) Grant the bot message sending permissions in the community",
-  `Docs: ${formatDocsLink("/channels/vk", "channels/vk")}`,
+  `Docs: ${formatDocsLink("/channels/vk-openclaw-channel", "channels/vk")}`,
 ];
 
 const VK_ALLOW_FROM_HELP_LINES = [
@@ -37,14 +37,14 @@ const VK_ALLOW_FROM_HELP_LINES = [
   "- 123456789",
   "- vk:123456789",
   "Multiple entries: comma-separated.",
-  `Docs: ${formatDocsLink("/channels/vk", "channels/vk")}`,
+  `Docs: ${formatDocsLink("/channels/vk-openclaw-channel", "channels/vk")}`,
 ];
 
 const vkDmPolicy: ChannelSetupDmPolicy = {
   label: "VK",
   channel,
-  policyKey: "channels.vk.dmPolicy",
-  allowFromKey: "channels.vk.allowFrom",
+  policyKey: "channels.vk-openclaw-channel.dmPolicy",
+  allowFromKey: "channels.vk-openclaw-channel.allowFrom",
   getCurrent: (cfg) =>
     ((cfg.channels as Record<string, Record<string, string>> | undefined)?.vk?.dmPolicy as
       | DmPolicy
@@ -158,7 +158,7 @@ export const vkSetupWizard: ChannelSetupWizard = {
     lines: [
       "Ensure Bots Long Poll API is enabled in your VK community settings.",
       "The bot will automatically start receiving messages via long polling.",
-      `Docs: ${formatDocsLink("/channels/vk", "channels/vk")}`,
+      `Docs: ${formatDocsLink("/channels/vk-openclaw-channel", "channels/vk")}`,
     ],
   },
   disable: (cfg) => setSetupChannelEnabled(cfg, channel, false),
