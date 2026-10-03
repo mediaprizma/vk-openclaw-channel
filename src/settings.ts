@@ -23,7 +23,7 @@ function readVkChannelSection(section: string): Record<string, unknown> | undefi
           | { vk?: Record<string, unknown> }
           | undefined
       : undefined;
-    const value = channels?.vk?.[section];
+    const value = channels?.["vk-openclaw-channel"]?.[section];
     return value && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : undefined;
