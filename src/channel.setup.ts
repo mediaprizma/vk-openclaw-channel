@@ -12,12 +12,12 @@ import { vkSetupAdapter } from "./setup-core.js";
 import { vkSetupWizard } from "./setup-surface.js";
 
 const meta = {
-  id: "vk",
+  id: "vk-openclaw-channel",
   label: "VK",
   selectionLabel: "VK (VKontakte Bot)",
   detailLabel: "VK Bot",
-  docsPath: "/channels/vk",
-  docsLabel: "vk",
+  docsPath: "/channels/vk-openclaw-channel",
+  docsLabel: "vk-openclaw-channel",
   blurb: "VK (VKontakte) community bot via Long Poll API.",
   systemImage: "message.fill",
 } as const;
@@ -25,7 +25,7 @@ const meta = {
 const normalizeVkAllowFrom = (entry: string) => entry.replace(/^vk:(?:user:)?/i, "");
 
 export const vkSetupPlugin: ChannelPlugin<ResolvedVkAccount> = {
-  id: "vk",
+  id: "vk-openclaw-channel",
   meta: {
     ...meta,
     quickstartAllowFrom: true,
@@ -38,7 +38,7 @@ export const vkSetupPlugin: ChannelPlugin<ResolvedVkAccount> = {
     nativeCommands: false,
     blockStreaming: true,
   },
-  reload: { configPrefixes: ["channels.vk"] },
+  reload: { configPrefixes: ["channels.vk-openclaw-channel"] },
   configSchema: buildChannelConfigSchema(VkConfigSchema),
   config: {
     listAccountIds: (cfg: OpenClawConfig) => listVkAccountIds(cfg),
