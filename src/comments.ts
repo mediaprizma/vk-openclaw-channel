@@ -89,9 +89,7 @@ function collectVkPublicImageUrls(html: string): string[] {
     if (isVkPhotoUrl(url)) urls.add(url);
   };
 
-  // VK's public photo viewer exposes the actual post image through this stable
-  // test id. Prefer it over generic vkuserphoto URLs because the page also
-  // contains avatars, icons and other UI images.
+  // Prefer VK's explicit photo-viewer node when it is present.
   const pvPhotoRegex =
     /<img\b[^>]*data-testid=["']pv_photo_image["'][^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
   const pvPhotoRegexReversed =
@@ -100,16 +98,46 @@ function collectVkPublicImageUrls(html: string): string[] {
   for (const match of html.matchAll(pvPhotoRegex)) add(match[1]);
   for (const match of html.matchAll(pvPhotoRegexReversed)) add(match[1]);
 
-  // Fallback for public pages where VK does not render the photo-viewer node.
+  // The ordinary wall page may not render the viewer at all. In that case VK
+  // often embeds the real photo URL in serialized HTML/JSON. Current source
+  // images use /s/v1/ig2/ and/or crop/as rendition parameters, unlike the
+  // small avatar and icon URLs also present on the page.
+  const embeddedUrlRegex =
+    /https?:\/\/[^"'<\s]+vkuserphoto\.ru[^"'<\s]+/gi;
+  for (const match of html.matchAll(embeddedUrlRegex)) {
+    add(match[0].replace(/\\\//g, "/"));
+  }
+
+  const directVkUrlRegex =
+    /(?:src|content|url|photo_\d+|image|original|orig|large)["'\s:=]+["']?(https?:\/\/[^"'\s<>]+vkuserphoto\.ru[^"'\s<>]*)/gi;
+  for (const match of html.matchAll(directVkUrlRegex)) add(match[1]);
+
+  const mediaCandidates = [...urls].filter((url) => {
+    try {
+      const parsed = new URL(url);
+      const path = parsed.pathname.toLowerCase();
+      return path.includes("/s/v1/ig2/") || parsed.searchParams.has("as") || parsed.searchParams.has("crop");
+    } catch {
+      return false;
+    }
+  });
+
+  // og:image is a weaker fallback, but it is still a legitimate post image.
+  const ogUrls: string[] = [];
   const ogImageRegex =
     /<meta\b[^>]*(?:property|name)=["']og:image["'][^>]*\bcontent=["']([^"']+)["'][^>]*>/gi;
   const ogImageRegexReversed =
     /<meta\b[^>]*\bcontent=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["'][^>]*>/gi;
+  for (const match of html.matchAll(ogImageRegex)) {
+    const raw = decodeHtmlAttribute(match[1]?.trim() ?? "");
+    if (isVkPhotoUrl(raw)) ogUrls.push(raw);
+  }
+  for (const match of html.matchAll(ogImageRegexReversed)) {
+    const raw = decodeHtmlAttribute(match[1]?.trim() ?? "");
+    if (isVkPhotoUrl(raw)) ogUrls.push(raw);
+  }
 
-  for (const match of html.matchAll(ogImageRegex)) add(match[1]);
-  for (const match of html.matchAll(ogImageRegexReversed)) add(match[1]);
-
-  return [...urls];
+  return [...new Set([...mediaCandidates, ...ogUrls])];
 }
 
 function extractVkPublicMeta(html: string, key: "og:description" | "og:title"): string | undefined {
@@ -257,11 +285,15 @@ export async function resolveVkWallComment(
   }
 
   let publicPost: Awaited<ReturnType<typeof fetchVkPublicWallPost>> | undefined;
-  if (!post) {
+  const apiPostMedia = normalizePostAttachments(post?.attachments).filter(
+    (attachment) => attachment.kind === "image" || attachment.kind === "video",
+  );
+
+  // A community token may return a partial post object without attachments.
+  // Treat that as unresolved media and use the public page as the fallback.
+  if (apiPostMedia.length === 0) {
     try {
       publicPost = await fetchVkPublicWallPost(postUrl, (line) => {
-        // Keep diagnostics on the channel logger path; the caller can inspect
-        // the exact public-page failure instead of silently losing post media.
         console.warn(line);
       });
     } catch (err) {
@@ -276,10 +308,6 @@ export async function resolveVkWallComment(
   const sourceType: VkCommentSource["type"] = postType === "clip" ? "clip" : "post";
   const eventType: VkCommentEventType = sourceType === "clip" ? "clip_comment" : "post_comment";
 
-  const postAttachments = normalizePostAttachments(post?.attachments);
-  const apiPostMedia = postAttachments.filter((attachment) =>
-    attachment.kind === "image" || attachment.kind === "video",
-  );
   const postMedia = apiPostMedia.length > 0 ? apiPostMedia : (publicPost?.media ?? []);
 
   const origin: VkPostOrigin = {
