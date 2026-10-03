@@ -74,24 +74,16 @@ export async function resolveVkWallComment(
     return null;
   }
 
-  const sourceType: VkCommentSource["type"] = "post";
-  const eventType: VkCommentEventType = "post_comment";
-
-  const postType = readString(post?.postType) ?? readString(post?.post_type);
-  const sourceType: VkCommentSource["type"] = postType === "clip" ? "clip" : "post";
-  const eventType: VkCommentEventType = sourceType === "clip" ? "clip_comment" : "post_comment";
-
-  const postMedia = apiPostMedia.length > 0 ? apiPostMedia : (publicPost?.media ?? []);
-
   const origin: VkPostOrigin = {
-    type: sourceType,
+    type: "post",
     ownerId,
     id: postId,
     url: buildPostUrl(ownerId, postId),
     media: [],
   };
+
   return {
-    eventType,
+    eventType: "post_comment",
     commentId: id,
     senderId,
     text,
