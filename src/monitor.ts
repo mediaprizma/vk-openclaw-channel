@@ -8,6 +8,7 @@ import { createStallWatchdog, type StallWatchdog } from "./stall-watchdog.js";
 import { resolveVkAccount } from "./accounts.js";
 import { redactVkId } from "./diagnostics.js";
 import { handleVkInbound } from "./inbound.js";
+import { resolveVkVideoComment, resolveVkWallComment } from "./comments.js";
 import {
   extractVkInboundAttachments,
   extractVkInboundForwards,
@@ -248,6 +249,45 @@ async function canUseBotsLongPoll(
   }
 }
 
+function isVkCommentEnabled(account: VkAccountConfig, kind: "post" | "clip" | "video"): boolean {
+  const comments = account.comments;
+  if (comments?.enabled === false) return false;
+  if (kind === "post") return comments?.postComments !== false;
+  if (kind === "clip") return comments?.clipComments !== false;
+  return comments?.videoComments === true;
+}
+
+function commentMessageFromContext(
+  comment:
+    | Awaited<ReturnType<typeof resolveVkWallComment>>
+    | Awaited<ReturnType<typeof resolveVkVideoComment>>,
+): VkInboundMessage | null {
+  if (!comment) return null;
+  const contentId = comment.postId ?? comment.videoId;
+  if (contentId === undefined) return null;
+  return {
+    eventType: "message",
+    messageId: `comment:${comment.eventType}:${comment.ownerId}:${contentId}:${comment.commentId}`,
+    peerId: comment.senderId,
+    senderId: comment.senderId,
+    text: comment.text,
+    timestamp: comment.timestamp,
+    isGroup: false,
+    comment,
+    replyRoute: {
+      type: comment.eventType === "post_comment" ? "post_comment" : "clip_comment",
+      ownerId: comment.ownerId,
+      contentId,
+      commentId: comment.commentId,
+      ...(comment.replyToComment !== undefined ? { parentCommentId: comment.replyToComment } : {}),
+    },
+    attachments: comment.origin.media,
+    ...(comment.replyToComment !== undefined
+      ? { replyToMessageId: String(comment.replyToComment) }
+      : {}),
+  };
+}
+
 async function waitForAbort(signal?: AbortSignal): Promise<void> {
   if (!signal) {
     await new Promise<void>(() => {});
@@ -376,6 +416,71 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       opts.runtime.error?.(`vk: message handler error for peerId=${redactVkId(peerId)}: ${errorMessage}`);
+    }
+  });
+
+  // Public wall comments. VK Bots Long Poll exposes these as wall_reply_new.
+  // The sender id is the canonical customer peer; the comment itself carries
+  // the public delivery route and the source post/media context.
+  vk.updates.on("wall_reply_new", async (context) => {
+    if (stopRequested) return;
+    try {
+      const comment = await resolveVkWallComment(vk, context);
+      if (!comment) return;
+      const kind = comment.eventType === "clip_comment" ? "clip" : "post";
+      if (!isVkCommentEnabled(account.config, kind)) return;
+      const ownGroup = await resolveVkOwnGroup(opts.token);
+      if (ownGroup && comment.senderId === -ownGroup.id) return;
+      const message = commentMessageFromContext(comment);
+      if (!message) return;
+
+      opts.setStatus?.({ lastEventAt: Date.now() });
+      core.channel.activity.record({
+        channel: "vk-openclaw-channel",
+        accountId: account.accountId,
+        direction: "inbound",
+        at: message.timestamp,
+      });
+      opts.runtime.log?.(
+        `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.postId}`,
+      );
+      const currentCfg = readVkRuntimeConfig(core);
+      const currentAccount = resolveVkAccount({ cfg: currentCfg, accountId: account.accountId });
+      await handleVkInbound({ message, account: currentAccount, config: currentCfg, runtime: opts.runtime });
+    } catch (err) {
+      opts.runtime.error?.(`vk: wall_reply_new handler error: ${String(err)}`);
+    }
+  });
+
+  // VK sends video comments as video_comment_new. The video object has
+  // type=short_video for Clips, so the plugin normalizes those to clip_comment.
+  vk.updates.on("video_comment_new", async (context) => {
+    if (stopRequested) return;
+    try {
+      const comment = await resolveVkVideoComment(vk, context);
+      if (!comment) return;
+      const kind = comment.eventType === "clip_comment" ? "clip" : "video";
+      if (!isVkCommentEnabled(account.config, kind)) return;
+      const ownGroup = await resolveVkOwnGroup(opts.token);
+      if (ownGroup && comment.senderId === -ownGroup.id) return;
+      const message = commentMessageFromContext(comment);
+      if (!message) return;
+
+      opts.setStatus?.({ lastEventAt: Date.now() });
+      core.channel.activity.record({
+        channel: "vk-openclaw-channel",
+        accountId: account.accountId,
+        direction: "inbound",
+        at: message.timestamp,
+      });
+      opts.runtime.log?.(
+        `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.videoId}`,
+      );
+      const currentCfg = readVkRuntimeConfig(core);
+      const currentAccount = resolveVkAccount({ cfg: currentCfg, accountId: account.accountId });
+      await handleVkInbound({ message, account: currentAccount, config: currentCfg, runtime: opts.runtime });
+    } catch (err) {
+      opts.runtime.error?.(`vk: video_comment_new handler error: ${String(err)}`);
     }
   });
 
