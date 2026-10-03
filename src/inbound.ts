@@ -473,7 +473,12 @@ export async function handleVkInbound(params: {
     body: rawBody,
   });
 
-  const groupSystemPrompt = groupConfig?.systemPrompt?.trim() || undefined;
+  const systemPromptParts = [
+    account.config.systemPrompt?.trim(),
+    groupConfig?.systemPrompt?.trim(),
+  ].filter((value): value is string => Boolean(value));
+  const groupSystemPrompt =
+    systemPromptParts.length > 0 ? systemPromptParts.join("\n\n") : undefined;
   const resolvedMedia = await resolveVkInboundResolvedMedia({
     attachments: [
       ...collectVkOwnMedia(message.attachments),
