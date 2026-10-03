@@ -120,18 +120,18 @@
     "setupEntry": "./setup-entry.ts",
     "runtimeSetupEntry": "./dist/setup-entry.js",
     "channel": {
-      "id": "vk",
+      "id": "vk-openclaw-channel",
       "label": "VK",
       "selectionLabel": "VK (ВКонтакте)",
-      "docsPath": "/channels/vk",
-      "docsLabel": "vk",
+      "docsPath": "/channels/vk-openclaw-channel",
+      "docsLabel": "vk-openclaw-channel",
       "blurb": "Канал OpenClaw для сообществ ВКонтакте через Bots Long Poll API.",
       "order": 80,
       "quickstartAllowFrom": true
     },
     "install": {
       "npmSpec": "vk-openclaw-channel",
-      "localPath": "extensions/vk",
+      "localPath": "extensions/vk-openclaw-channel",
       "defaultChoice": "npm"
     }
   }
