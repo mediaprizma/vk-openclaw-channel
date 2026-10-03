@@ -138,6 +138,29 @@
               }
             }
           },
+          "comments": {
+            "type": "object",
+            "description": "VK wall/video comment handling. Comment events reuse the customer's direct session while keeping a separate reply route to the public thread.",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Enable comment events."
+              },
+              "postComments": {
+                "type": "boolean",
+                "description": "Handle comments on wall posts."
+              },
+              "clipComments": {
+                "type": "boolean",
+                "description": "Handle comments on VK Clips (short videos)."
+              },
+              "videoComments": {
+                "type": "boolean",
+                "description": "Handle comments on regular VK videos."
+              }
+            }
+          },
           "contextVisibility": {
             "type": "string",
             "description": "Which shared context reaches the agent in groups: every forward and quote (`all`), only those from allowlisted authors (`allowlist`), or the same plus a quote of the bot's own message (`allowlist_quote`). Accepted per account too.",
