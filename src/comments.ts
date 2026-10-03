@@ -59,7 +59,7 @@ function normalizePostAttachments(raw: unknown): VkInboundAttachment[] {
 }
 
 export function isVkCommentEventType(value: string): value is VkCommentEventType {
-  return value === "post_comment" || value === "clip_comment";
+  return value === "post_comment" || value === "clip_comment" || value === "video_comment";
 }
 
 export async function resolveVkWallComment(
