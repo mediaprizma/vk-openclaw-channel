@@ -38,13 +38,13 @@
 
 ## Зависший Long Poll
 
-Действие: после хотя бы одного успешного опроса транспорт перестаёт завершать Long Poll-запросы дольше `channels.vk.transport.silenceMs`.
+Действие: после хотя бы одного успешного опроса транспорт перестаёт завершать Long Poll-запросы дольше `channels.vk-openclaw-channel.transport.silenceMs`.
 
 Результат: задача аккаунта завершается, а единственным владельцем повторного запуска остаётся штатный lifecycle OpenClaw.
 
 ## Диагностика без утечки данных
 
-Действие: включить `channels.vk.diagnostics.level: "redacted"`, вызвать ошибку доставки и проверить журнал gateway.
+Действие: включить `channels.vk-openclaw-channel.diagnostics.level: "redacted"`, вызвать ошибку доставки и проверить журнал gateway.
 
 Результат: журнал содержит этап, вид вложения и безопасный код ошибки, но не содержит токен, подписанный URL, путь, имя собеседника или содержимое вложения; account-level `diagnostics` отклоняется валидатором.
 
@@ -74,7 +74,7 @@
 
 ## Токен сообщества ссылкой на секрет
 
-Действие: задать `channels.vk.token: { "source": "env", "provider": "default", "id": "VK_GROUP_TOKEN" }` с токеном сообщества в переменной `VK_GROUP_TOKEN` окружения gateway, выполнить `openclaw gateway restart` и написать боту в личные сообщения. Затем задать рядом непустой `channels.vk.tokenFile` и снова перезапустить. Затем убрать `tokenFile`, указать в ссылке переменную, которой в окружении нет (`"id": "VK_MISSING"`), и перезапустить.
+Действие: задать `channels.vk-openclaw-channel.token: { "source": "env", "provider": "default", "id": "VK_GROUP_TOKEN" }` с токеном сообщества в переменной `VK_GROUP_TOKEN` окружения gateway, выполнить `openclaw gateway restart` и написать боту в личные сообщения. Затем задать рядом непустой `channels.vk-openclaw-channel.tokenFile` и снова перезапустить. Затем убрать `tokenFile`, указать в ссылке переменную, которой в окружении нет (`"id": "VK_MISSING"`), и перезапустить.
 
 Результат: с одной ссылкой бот отвечает, токена в `openclaw.json` нет. С непустым `tokenFile` токен читается из файла, а ссылка не разрешается вовсе и не мешает запуску. Когда ссылку не разрешить, учётная запись VK не стартует, в журнале названа ссылка (`source:provider:id`), остальные каналы работают.
 
@@ -92,13 +92,13 @@
 
 ## Пределы озвучки в конфиге
 
-Действие: задать `channels.vk.audio.maxSegments: 0`, затем перенести блок `audio` внутрь `channels.vk.accounts.<id>` и каждый раз выполнить `openclaw config validate`.
+Действие: задать `channels.vk-openclaw-channel.audio.maxSegments: 0`, затем перенести блок `audio` внутрь `channels.vk-openclaw-channel.accounts.<id>` и каждый раз выполнить `openclaw config validate`.
 
 Результат: оба конфига отклоняются до запуска — пределы задаются только на весь канал и только целыми положительными числами.
 
 ## Черновик шагов
 
-Действие: задать `channels.vk.streaming: { mode: "progress", progress: { label: "⏳ Работаю", toolProgress: true } }` и попросить агента о задаче с вызовом инструмента — сначала в личном диалоге, затем в групповой беседе.
+Действие: задать `channels.vk-openclaw-channel.streaming: { mode: "progress", progress: { label: "⏳ Работаю", toolProgress: true } }` и попросить агента о задаче с вызовом инструмента — сначала в личном диалоге, затем в групповой беседе.
 
 Результат: в чате одно сообщение с заголовком и строками шагов, которое правится по ходу работы и в конце становится ответом без заголовка; длинный ответ продолжается следующими сообщениями, картинки и голосовые приходят следом; в группе ответ цитирует входящее сообщение, в личке — нет. Ход, закончившийся без ответа, не оставляет сообщения «работаю».
 
@@ -116,7 +116,7 @@
 
 ## Настройка черновика в конфиге
 
-Действие: задать `channels.vk.streaming.mode: "partial"`, затем `channels.vk.streaming: true`, затем перенести блок `streaming` внутрь `channels.vk.accounts.<id>` и каждый раз выполнить `openclaw config validate`.
+Действие: задать `channels.vk-openclaw-channel.streaming.mode: "partial"`, затем `channels.vk-openclaw-channel.streaming: true`, затем перенести блок `streaming` внутрь `channels.vk-openclaw-channel.accounts.<id>` и каждый раз выполнить `openclaw config validate`.
 
 Результат: все три конфига отклоняются до запуска — VK умеет только режимы `off` и `progress`, и задаются они на весь канал.
 
