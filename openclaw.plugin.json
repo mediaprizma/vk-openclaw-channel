@@ -22,6 +22,12 @@
           "placeholder": "Instructions for the VK agent…",
           "advanced": false
         },
+        "commentPromptTemplate": {
+          "label": "VK comment prompt template",
+          "help": "Template used for every VK wall, clip or video comment. Leave empty to use the built-in template.",
+          "placeholder": "Источник обращения:\nВКонтакте → {{source_label}}\nАвтор VK ID: {{sender_id}}\nКомментарий ID: {{comment_id}}\n\nКомментарий клиента:\n{{comment_text}}\n\nИсходный контент: {{origin_type}}\nID: {{origin_id}}\nСсылка: {{origin_url}}\n{{origin_extra}}\n\nПравило ответа:\n{{response_rules}}",
+          "advanced": false
+        },
         "accounts.*.systemPrompt": {
           "label": "Account system prompt",
           "help": "System prompt for this VK account. It overrides the channel-wide prompt.",
@@ -193,6 +199,10 @@
           "systemPrompt": {
             "type": "string",
             "description": "Trusted system prompt injected into every VK turn. This is available channel-wide and can be overridden per account."
+          },
+          "commentPromptTemplate": {
+            "type": "string",
+            "description": "Template for the context sent to the agent when a VK wall, clip or video comment arrives. Supports {{source_label}}, {{sender_id}}, {{comment_id}}, {{comment_text}}, {{origin_type}}, {{origin_id}}, {{origin_url}}, {{origin_extra}} and {{response_rules}}."
           },
           "audio": {
             "type": "object",
@@ -392,6 +402,10 @@
 "systemPrompt": {
                   "type": "string",
                   "description": "System prompt for this VK account. When set, it overrides the channel-wide system prompt."
+                },
+                "commentPromptTemplate": {
+                  "type": "string",
+                  "description": "Template for VK comment context for this account. Supports {{source_label}}, {{sender_id}}, {{comment_id}}, {{comment_text}}, {{origin_type}}, {{origin_id}}, {{origin_url}}, {{origin_extra}} and {{response_rules}}."
                 },
                 "contextVisibility": {
                   "type": "string",
