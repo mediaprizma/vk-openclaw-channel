@@ -1,10 +1,10 @@
 {
-  "name": "@openclaw-vk/vk",
-  "version": "2026.9.10",
-  "description": "OpenClaw VK (VKontakte) channel plugin",
+  "name": "vk-openclaw-channel",
+  "version": "0.1.0",
+  "description": "Самостоятельный VK-канал для OpenClaw с поддержкой сообщений сообществ ВКонтакте.",
   "author": {
-    "name": "Pavel Frankov",
-    "url": "https://github.com/pfrankov"
+    "name": "Dmitry Nikolaev",
+    "url": "https://github.com/mediaprizma"
   },
   "license": "Apache-2.0",
   "type": "module",
@@ -22,12 +22,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pfrankov/openclaw-vk.git"
+    "url": "git+https://github.com/mediaprizma/vk-openclaw-channel.git"
   },
   "bugs": {
-    "url": "https://github.com/pfrankov/openclaw-vk/issues"
+    "url": "https://github.com/mediaprizma/vk-openclaw-channel/issues"
   },
-  "homepage": "https://github.com/pfrankov/openclaw-vk#readme",
+  "homepage": "https://github.com/mediaprizma/vk-openclaw-channel#readme",
   "publishConfig": {
     "access": "public"
   },
@@ -122,15 +122,15 @@
     "channel": {
       "id": "vk",
       "label": "VK",
-      "selectionLabel": "VK (VKontakte Bot)",
+      "selectionLabel": "VK (ВКонтакте)",
       "docsPath": "/channels/vk",
       "docsLabel": "vk",
-      "blurb": "VK (VKontakte) community bot via Long Poll API.",
+      "blurb": "Канал OpenClaw для сообществ ВКонтакте через Bots Long Poll API.",
       "order": 80,
       "quickstartAllowFrom": true
     },
     "install": {
-      "npmSpec": "@openclaw-vk/vk",
+      "npmSpec": "vk-openclaw-channel",
       "localPath": "extensions/vk",
       "defaultChoice": "npm"
     }
