@@ -4,7 +4,7 @@ import type { ChannelSetupAdapter } from "openclaw/plugin-sdk/setup";
 import { listVkAccountIds, resolveVkAccount } from "./accounts.js";
 import type { VkConfig } from "./types.js";
 
-const channel = "vk" as const;
+const channel = "vk-openclaw-channel" as const;
 
 export function patchVkAccountConfig(params: {
   cfg: OpenClawConfig;
