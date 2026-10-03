@@ -170,7 +170,38 @@ export async function resolveVkVideoComment(
   };
 }
 
-export function formatVkCommentContext(comment: VkInboundComment): string {
+export const DEFAULT_VK_COMMENT_PROMPT_TEMPLATE = [
+  "Источник обращения:",
+  "ВКонтакте → {{source_label}}",
+  "Автор VK ID: {{sender_id}}",
+  "Комментарий ID: {{comment_id}}",
+  "",
+  "Комментарий клиента:",
+  "{{comment_text}}",
+  "",
+  "Исходный контент: {{origin_type}}",
+  "ID: {{origin_id}}",
+  "Ссылка: {{origin_url}}",
+  "{{origin_extra}}",
+  "",
+  "Правило ответа:",
+  "{{response_rules}}",
+].join("\\n");
+
+const DEFAULT_VK_COMMENT_RESPONSE_RULES = [
+  "Если вопрос можно решить публично — отвечай в текущем комментарии.",
+  "Если для расчёта или консультации нужны персональные детали, предложи клиенту написать в личные сообщения.",
+  "Не утверждай, что можешь написать клиенту первым в личные сообщения, если это не подтверждено успешной доставкой.",
+].join("\\n");
+
+function renderVkCommentPromptTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\\{\\{([a-z_]+)\\}\\}/g, (_, key: string) => values[key] ?? "");
+}
+
+export function formatVkCommentContext(
+  comment: VkInboundComment,
+  template = DEFAULT_VK_COMMENT_PROMPT_TEMPLATE,
+): string {
   const sourceLabel =
     comment.eventType === "post_comment"
       ? "комментарий к записи"
@@ -179,42 +210,27 @@ export function formatVkCommentContext(comment: VkInboundComment): string {
         : "комментарий к видео";
 
   const origin = comment.origin;
-  const lines = [
-    "Источник обращения:",
-    `ВКонтакте → ${sourceLabel}`,
-    `Автор VK ID: ${comment.senderId}`,
-    `Комментарий ID: ${comment.commentId}`,
-    "",
-    "Комментарий клиента:",
-    comment.text || "(без текста)",
-    "",
-    `Исходный контент: ${origin.type}`,
-    `ID: ${origin.id}`,
-    `Ссылка: ${origin.url}`,
-  ];
-
-  if (origin.title) lines.push(`Название: ${origin.title}`);
-  if (origin.text) {
-    lines.push("", "Текст исходного контента:", origin.text);
-  }
-
+  const extraLines: string[] = [];
+  if (origin.title) extraLines.push(`Название: ${origin.title}`);
+  if (origin.text) extraLines.push("Текст исходного контента:", origin.text);
   if (origin.media.length > 0) {
-    lines.push(
-      "",
+    extraLines.push(
       `В исходном контенте доступно медиа: ${origin.media.length}`,
       "Медиа передано агенту отдельно; используй его для анализа, если это необходимо для ответа.",
     );
   }
 
-  lines.push(
-    "",
-    "Правило ответа:",
-    "Если вопрос можно решить публично — отвечай в текущем комментарии.",
-    "Если для расчёта или консультации нужны персональные детали, предложи клиенту написать в личные сообщения.",
-    "Не утверждай, что можешь написать клиенту первым в личные сообщения, если это не подтверждено успешной доставкой.",
-  );
-
-  return lines.join("\n");
+  return renderVkCommentPromptTemplate(template, {
+    source_label: sourceLabel,
+    sender_id: String(comment.senderId),
+    comment_id: String(comment.commentId),
+    comment_text: comment.text || "(без текста)",
+    origin_type: origin.type,
+    origin_id: String(origin.id),
+    origin_url: origin.url,
+    origin_extra: extraLines.join("\\n"),
+    response_rules: DEFAULT_VK_COMMENT_RESPONSE_RULES,
+  });
 }
 
 export async function sendVkCommentReply(params: {
