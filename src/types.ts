@@ -115,6 +115,8 @@ export type VkAccountConfig = {
   groupAllowFrom?: Array<string | number>;
   /** Long-poll transport tunables; see `resolveTransportSilenceMs` in monitor.ts. */
   transport?: { silenceMs?: number };
+  /** Channel/account system prompt injected into every VK turn. */
+  systemPrompt?: string;
   /** Which forwards reach the agent in groups; see `VK_CONTEXT_VISIBILITY_MODES`. */
   contextVisibility?: VkContextVisibility;
   comments?: {
