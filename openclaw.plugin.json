@@ -24,7 +24,7 @@
         },
         "accounts.*.systemPrompt": {
           "label": "Account system prompt",
-          "help": "Trusted instructions for this VK account.",
+          "help": "System prompt for this VK account. It overrides the channel-wide prompt.",
           "placeholder": "Instructions for this VK account…",
           "advanced": false
         },
@@ -391,7 +391,7 @@
           },
 "systemPrompt": {
                   "type": "string",
-                  "description": "Additional trusted system prompt for this VK account."
+                  "description": "System prompt for this VK account. When set, it overrides the channel-wide system prompt."
                 },
                 "contextVisibility": {
                   "type": "string",
