@@ -31,7 +31,7 @@ import {
 } from "openclaw/plugin-sdk/channel-secret-basic-runtime";
 import { normalizeAccountId } from "openclaw/plugin-sdk/account-id";
 
-const CHANNEL_KEY = "vk";
+const CHANNEL_KEY = "vk-openclaw-channel";
 const DEFAULT_ACCOUNT_ID = "default";
 
 export const secretTargetRegistryEntries = createChannelSecretTargetRegistryEntries({
