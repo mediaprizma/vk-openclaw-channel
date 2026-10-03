@@ -861,7 +861,7 @@ function resolveVkPayloadParts(
 
 function recordOutboundActivity(accountId: string): void {
   getVkRuntime().channel.activity.record({
-    channel: "vk",
+    channel: "vk-openclaw-channel",
     accountId,
     direction: "outbound",
     at: Date.now(),
