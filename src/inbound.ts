@@ -292,7 +292,10 @@ export async function handleVkInbound(params: {
 
   const inboundSurfaceContext =
     !isComment && !isGroup
-      ? "Канал сообщения: ВКонтакте → личные сообщения."
+      ? [
+          "Канал сообщения: ВКонтакте → личные сообщения.",
+          `VK ID клиента: ${message.senderId}`,
+        ].join("\n")
       : undefined;
 
   const agentBody = inboundSurfaceContext
