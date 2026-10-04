@@ -28,6 +28,12 @@
           "placeholder": "Источник обращения:\nВКонтакте → {{source_label}}\nАвтор VK ID: {{sender_id}}\nКомментарий ID: {{comment_id}}\n\nКомментарий клиента:\n{{comment_text}}\n\nИсходный контент: {{origin_type}}\nID: {{origin_id}}\nСсылка: {{origin_url}}\n{{origin_extra}}\n\nПравило ответа:\n{{response_rules}}",
           "advanced": false
         },
+        "commentResponseRules": {
+          "label": "VK comment response rules",
+          "help": "Rules appended to every VK comment context under «Правило ответа». Leave empty to use the built-in rules.",
+          "placeholder": "Если вопрос можно решить публично — отвечай в текущем комментарии.\nЕсли для расчёта или консультации нужны персональные детали, предложи клиенту написать в личные сообщения.\nНе утверждай, что можешь написать клиенту первым в личные сообщения, если это не подтверждено успешной доставкой.",
+          "advanced": false
+        },
         "accounts.*.systemPrompt": {
           "label": "Account system prompt",
           "help": "System prompt for this VK account. It overrides the channel-wide prompt.",
@@ -203,6 +209,10 @@
           "commentPromptTemplate": {
             "type": "string",
             "description": "Template for the context sent to the agent when a VK wall, clip or video comment arrives. Supports {{source_label}}, {{sender_id}}, {{comment_id}}, {{comment_text}}, {{origin_type}}, {{origin_id}}, {{origin_url}}, {{origin_extra}} and {{response_rules}}."
+          },
+          "commentResponseRules": {
+            "type": "string",
+            "description": "Rules appended under «Правило ответа» for every VK comment. Leave empty to use the built-in rules."
           },
           "audio": {
             "type": "object",
@@ -406,6 +416,10 @@
                 "commentPromptTemplate": {
                   "type": "string",
                   "description": "Template for VK comment context for this account. Supports {{source_label}}, {{sender_id}}, {{comment_id}}, {{comment_text}}, {{origin_type}}, {{origin_id}}, {{origin_url}}, {{origin_extra}} and {{response_rules}}."
+                },
+                "commentResponseRules": {
+                  "type": "string",
+                  "description": "Rules appended under «Правило ответа» for every VK comment handled by this account."
                 },
                 "contextVisibility": {
                   "type": "string",
