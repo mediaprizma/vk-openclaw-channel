@@ -50,11 +50,6 @@
           "help": "Включить получение и обработку комментариев VK.",
           "advanced": false
         },
-        "comments.includePostText": {
-          "label": "Передавать текст исходной записи",
-          "help": "Если включено, плагин получает текст исходной записи VK и добавляет его в контекст агента при комментариях к постам.",
-          "advanced": true
-        },
         "comments.postComments": {
           "label": "Комментарии к записям",
           "help": "Обрабатывать комментарии к записям сообщества.",
@@ -279,10 +274,6 @@
                 "type": "boolean",
                 "description": "Handle comments on regular VK videos."
               },
-              "includePostText": {
-                "type": "boolean",
-                "description": "Передавать агенту текст исходной записи ВКонтакте вместе с комментарием."
-              }
             }
           },
           "contextVisibility": {
@@ -499,10 +490,6 @@
               "postComments": { "type": "boolean" },
               "clipComments": { "type": "boolean" },
               "videoComments": { "type": "boolean" },
-              "includePostText": {
-                "type": "boolean",
-                "description": "Передавать агенту текст исходной записи ВКонтакте вместе с комментарием."
-              }
             }
           },
 "systemPrompt": {
