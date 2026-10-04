@@ -273,7 +273,7 @@
               "videoComments": {
                 "type": "boolean",
                 "description": "Handle comments on regular VK videos."
-              },
+              }
             }
           },
           "contextVisibility": {
