@@ -81,9 +81,13 @@ export async function resolveVkWallComment(
       const response = await vk.api.wall.getById({
         posts: `${ownerId}_${postId}`,
       } as never);
-      const items = Array.isArray((response as { items?: unknown[] }).items)
-        ? (response as { items: unknown[] }).items
-        : [];
+      // vk-io unwraps VK API's "response". Without extended=1, wall.getById
+      // returns the post list directly, not { items: [...] }.
+      const items = Array.isArray(response)
+        ? response
+        : Array.isArray((response as { items?: unknown[] }).items)
+          ? (response as { items: unknown[] }).items
+          : [];
       const post = asRecord(items[0]);
       postText = readString(post?.text);
     } catch {
