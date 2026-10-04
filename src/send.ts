@@ -905,6 +905,20 @@ async function sendVkApiMessage(params: {
       ? JSON.stringify(params.formatted.formatData)
       : undefined;
   const randomId = getRandomId();
+  // OpenClaw can carry reply metadata through several layers. VK `messages.send`
+  // accepts `reply_to` only as a real integer message id. Never serialize an
+  // empty, non-numeric, NaN or otherwise malformed value: ordinary VK DMs do
+  // not need `reply_to` at all, and public comments use `reply_to_comment` in
+  // their dedicated sender path.
+  const replyToRaw = params.opts?.replyTo?.trim();
+  const replyToNumber = replyToRaw && /^\d+$/.test(replyToRaw) ? Number(replyToRaw) : undefined;
+  const validReplyTo =
+    replyToNumber !== undefined && Number.isSafeInteger(replyToNumber) && replyToNumber > 0
+      ? replyToNumber
+      : undefined;
+  if (replyToRaw && validReplyTo === undefined) {
+    vkDiag("ignoring invalid replyTo", { replyTo: replyToRaw });
+  }
   // Every message of every path goes out through here, so this is where a stop
   // is honoured per message: after an upload, between chunks, before a retry.
   const messageId = await withVkRetry(
@@ -915,7 +929,7 @@ async function sendVkApiMessage(params: {
         random_id: randomId,
         ...(params.attachment ? { attachment: params.attachment } : {}),
         ...(keyboard ? { keyboard } : {}),
-        ...(params.opts?.replyTo ? { reply_to: Number(params.opts.replyTo) } : {}),
+        ...(validReplyTo !== undefined ? { reply_to: validReplyTo } : {}),
         ...(formatData ? { format_data: formatData } : {}),
       });
     },
