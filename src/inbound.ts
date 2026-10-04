@@ -533,7 +533,7 @@ export async function handleVkInbound(params: {
 
   const ctxPayload = core.channel.reply.finalizeInboundContext({
     Body: body,
-    BodyForAgent: rawBody,
+    BodyForAgent: agentBody,
     RawBody: visibleBody || commandInput,
     CommandBody: commandInput,
     BodyForCommands: commandInput,
