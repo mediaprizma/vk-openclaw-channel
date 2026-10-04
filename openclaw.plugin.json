@@ -105,17 +105,11 @@
           "help": "Показывать промежуточные шаги агента в одном редактируемом сообщении.",
           "advanced": true
         },
-        "accounts.*.commentPromptTemplate": {
-          "label": "Шаблон контекста комментария для аккаунта",
-          "help": "Шаблон контекста комментария для этого аккаунта VK. Имеет приоритет над общим шаблоном.",
-          "placeholder": "Оставьте пустым, чтобы использовать общий шаблон.",
-          "advanced": true
-        },
-        "accounts.*.commentResponseRules": {
-          "label": "Правила ответа для аккаунта",
-          "help": "Дополнительные правила ответа на комментарии для этого аккаунта. Пустое значение означает отсутствие дополнительных правил.",
-          "placeholder": "Например: отвечай кратко; если нужен расчёт — предложи личные сообщения.",
-          "advanced": true
+        "accounts.*.commentResponseInstructions": {
+          "label": "Инструкция агенту при ответе на комментарии VK",
+          "help": "Общая инструкция, которую агент получает перед ответом на комментарий VK. Контекст комментария и данные поста формируются плагином автоматически и не изменяются этой настройкой.",
+          "placeholder": "Например: перед ответом открой ссылку на исходный пост в браузере, изучи текст и изображение, затем ответь клиенту по существу.",
+          "advanced": false
         },
         "accounts.*.systemPrompt": {
           "label": "Инструкция для аккаунта VK",
@@ -289,13 +283,9 @@
             "type": "string",
             "description": "Trusted system prompt injected into every VK turn. This is available channel-wide and can be overridden per account."
           },
-          "commentPromptTemplate": {
+          "commentResponseInstructions": {
             "type": "string",
-            "description": "Template for the context sent to the agent when a VK wall, clip or video comment arrives. Supports {{source_label}}, {{sender_id}}, {{comment_id}}, {{comment_text}}, {{origin_type}}, {{origin_id}}, {{origin_url}}, {{origin_extra}} and {{response_rules}}."
-          },
-          "commentResponseRules": {
-            "type": "string",
-            "description": "Дополнительные правила под блоком «Правило ответа» для каждого комментария VK. Пустое значение означает, что дополнительные правила не добавляются."
+            "description": "Инструкция агенту при ответе на комментарии VK. Структура входящего контекста комментария фиксирована плагином и не настраивается через это поле."
           },
           "audio": {
             "type": "object",
@@ -496,13 +486,9 @@
                   "type": "string",
                   "description": "System prompt for this VK account. When set, it overrides the channel-wide system prompt."
                 },
-                "commentPromptTemplate": {
+                "commentResponseInstructions": {
                   "type": "string",
-                  "description": "Template for VK comment context for this account. Supports {{source_label}}, {{sender_id}}, {{comment_id}}, {{comment_text}}, {{origin_type}}, {{origin_id}}, {{origin_url}}, {{origin_extra}} and {{response_rules}}."
-                },
-                "commentResponseRules": {
-                  "type": "string",
-                  "description": "Rules appended under «Правило ответа» for every VK comment handled by this account."
+                  "description": "Инструкция агенту при ответе на комментарии VK. Структура входящего контекста комментария фиксирована плагином."
                 },
                 "contextVisibility": {
                   "type": "string",
