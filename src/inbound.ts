@@ -289,6 +289,15 @@ export async function handleVkInbound(params: {
         forwards: visibleForwards,
         envelope: envelopeOptions,
       });
+
+  const inboundSurfaceContext =
+    !isComment && !isGroup
+      ? "Канал сообщения: ВКонтакте → личные сообщения."
+      : undefined;
+
+  const agentBody = inboundSurfaceContext
+    ? inboundSurfaceContext + "\n\n" + rawBody
+    : rawBody;
   if (!rawBody) {
     // Only reachable when every forward was hidden: the empty-message check above
     // already let this one through. Say so, without naming the hidden authors.
@@ -470,7 +479,7 @@ export async function handleVkInbound(params: {
     timestamp: message.timestamp,
     previousTimestamp,
     envelope: envelopeOptions,
-    body: rawBody,
+    body: agentBody,
   });
 
   const systemPromptParts = [
