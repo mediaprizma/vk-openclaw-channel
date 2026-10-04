@@ -144,7 +144,7 @@ describe("VK comments", () => {
     expect(text).toContain("Правило ответа:\n");
   });
 
-  it("renders a custom VK comment prompt template", () => {
+  it("appends optional VK comment response instructions", () => {
     const comment = {
       eventType: "post_comment",
       commentId: 42,
@@ -155,8 +155,11 @@ describe("VK comments", () => {
       postId: 777,
       origin: { type: "post", ownerId: -100, id: 777, url: "https://vk.com/wall-100_777", media: [] },
     } satisfies VkInboundComment;
-    const text = formatVkCommentContext(comment, "Клиент {{sender_id}} спросил: {{comment_text}}\nПост: {{origin_url}}");
-    expect(text).toBe("Клиент 123 спросил: Цена?\nПост: https://vk.com/wall-100_777");
+    const text = formatVkCommentContext(comment, "Перед ответом открой ссылку в браузере.");
+    expect(text).toContain("Автор VK ID: 123");
+    expect(text).toContain("Ссылка: https://vk.com/wall-100_777");
+    expect(text).toContain("Инструкция агенту при ответе на комментарий:");
+    expect(text).toContain("Перед ответом открой ссылку в браузере.");
   });
 
   it("sends a wall comment reply to the original comment", async () => {
