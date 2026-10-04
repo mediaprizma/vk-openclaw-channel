@@ -128,7 +128,6 @@ export type VkAccountConfig = {
     clipComments?: boolean;
     videoComments?: boolean;
     /** Fetch and include the text of the source wall post in comment context. */
-    includePostText?: boolean;
   };
   groups?: Record<
     string,
