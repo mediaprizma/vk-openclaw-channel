@@ -262,6 +262,10 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
   // an explicit replyToId remains available to the outbound adapter.
   threading: {
     resolveReplyToMode: () => "off" as const,
+    buildToolContext: ({ context }) => ({
+      currentMessageId: undefined,
+      replyToMode: "off" as const,
+    }),
   },
   reload: { configPrefixes: ["channels.vk-openclaw-channel"] },
   configSchema: buildChannelConfigSchema(VkConfigSchema, {
