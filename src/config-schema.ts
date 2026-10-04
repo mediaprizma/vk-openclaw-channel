@@ -131,6 +131,7 @@ const VkCommentsSchema = z
     postComments: z.boolean().optional(),
     clipComments: z.boolean().optional(),
     videoComments: z.boolean().optional(),
+    includePostText: z.boolean().optional(),
   })
   .strict()
   .optional();
