@@ -23,6 +23,7 @@ function mergeVkAccountConfig(cfg: CoreConfig, accountId: string): VkAccountConf
     commentResponseRules: vkConfig.commentResponseRules,
     transport: vkConfig.transport,
     contextVisibility: vkConfig.contextVisibility,
+    comments: vkConfig.comments,
     groups: vkConfig.groups,
   };
 
