@@ -254,6 +254,15 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
     nativeCommands: false,
     blockStreaming: true,
   },
+  // VK messages do not have an OpenClaw-style native reply/thread target.
+  // In particular, `messages.send.reply_to` is optional for ordinary DMs and
+  // must not be inferred from the inbound VK message id. Public VK comments
+  // have their own explicit reply path in send.ts (`reply_to_comment`).
+  // Returning "off" disables only implicit reply-to injection by OpenClaw;
+  // an explicit replyToId remains available to the outbound adapter.
+  threading: {
+    resolveReplyToMode: () => "off" as const,
+  },
   reload: { configPrefixes: ["channels.vk-openclaw-channel"] },
   configSchema: buildChannelConfigSchema(VkConfigSchema, {
     uiHints: {
