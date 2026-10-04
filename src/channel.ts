@@ -63,6 +63,7 @@ const meta = {
   docsLabel: "vk-openclaw-channel",
   blurb: "VK (VKontakte) community bot via Long Poll API.",
   systemImage: "message.fill",
+  aliases: ["vk"],
 };
 
 const vkConfigAdapter = createScopedChannelConfigAdapter<ResolvedVkAccount, ResolvedVkAccount, OpenClawConfig>({
@@ -262,9 +263,11 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
   // an explicit replyToId remains available to the outbound adapter.
   threading: {
     resolveReplyToMode: () => "off" as const,
-    buildToolContext: ({ context }) => ({
+    buildToolContext: ({ context, hasRepliedRef }) => ({
+      currentChannelId: context.To?.trim() || undefined,
       currentMessageId: undefined,
       replyToMode: "off" as const,
+      hasRepliedRef,
     }),
   },
   reload: { configPrefixes: ["channels.vk-openclaw-channel"] },
