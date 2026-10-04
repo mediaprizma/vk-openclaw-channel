@@ -119,6 +119,7 @@ export type VkAccountConfig = {
   systemPrompt?: string;
   /** Template used to build the agent context for VK wall/video comments. */
   commentPromptTemplate?: string;
+  commentResponseRules?: string;
   /** Which forwards reach the agent in groups; see `VK_CONTEXT_VISIBILITY_MODES`. */
   contextVisibility?: VkContextVisibility;
   comments?: {
