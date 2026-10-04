@@ -508,7 +508,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
   vk.updates.on("wall_reply_new", async (context) => {
     if (stopRequested) return;
     try {
-      const comment = await resolveVkWallComment(vk, context);
+      const comment = await resolveVkWallComment(vk, context, account.config.comments?.includePostText === true);
       if (!comment) return;
       const kind = comment.eventType === "clip_comment" ? "clip" : "post";
       if (!isVkCommentEnabled(account.config, kind)) return;
