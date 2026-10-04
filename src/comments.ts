@@ -188,12 +188,7 @@ export const DEFAULT_VK_COMMENT_PROMPT_TEMPLATE = [
   "{{response_rules}}",
 ].join("\n");
 
-export const DEFAULT_VK_COMMENT_RESPONSE_RULES = [
-  "Если вопрос можно решить публично — отвечай в текущем комментарии.",
-  "Если для расчёта или консультации нужны персональные детали, предложи клиенту написать в личные сообщения.",
-  "Не утверждай, что можешь написать клиенту первым в личные сообщения, если это не подтверждено успешной доставкой.",
-].join("\n");
-
+export const DEFAULT_VK_COMMENT_RESPONSE_RULES = "";
 function renderVkCommentPromptTemplate(template: string, values: Record<string, string>): string {
   return template.replace(/\{\{([a-z_]+)\}\}/g, (_, key: string) => values[key] ?? "");
 }
