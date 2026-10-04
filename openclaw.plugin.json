@@ -489,7 +489,7 @@
               "enabled": { "type": "boolean" },
               "postComments": { "type": "boolean" },
               "clipComments": { "type": "boolean" },
-              "videoComments": { "type": "boolean" },
+              "videoComments": { "type": "boolean" }
             }
           },
 "systemPrompt": {
