@@ -170,33 +170,11 @@ export async function resolveVkVideoComment(
   };
 }
 
-export const DEFAULT_VK_COMMENT_PROMPT_TEMPLATE = [
-  "Источник обращения:",
-  "ВКонтакте → {{source_label}}",
-  "Автор VK ID: {{sender_id}}",
-  "Комментарий ID: {{comment_id}}",
-  "",
-  "Комментарий клиента:",
-  "{{comment_text}}",
-  "",
-  "Исходный контент: {{origin_type}}",
-  "ID: {{origin_id}}",
-  "Ссылка: {{origin_url}}",
-  "{{origin_extra}}",
-  "",
-  "Правило ответа:",
-  "{{response_rules}}",
-].join("\n");
-
-export const DEFAULT_VK_COMMENT_RESPONSE_RULES = "";
-function renderVkCommentPromptTemplate(template: string, values: Record<string, string>): string {
-  return template.replace(/\{\{([a-z_]+)\}\}/g, (_, key: string) => values[key] ?? "");
-}
+export const DEFAULT_VK_COMMENT_RESPONSE_INSTRUCTIONS = "";
 
 export function formatVkCommentContext(
   comment: VkInboundComment,
-  template = DEFAULT_VK_COMMENT_PROMPT_TEMPLATE,
-  responseRules = DEFAULT_VK_COMMENT_RESPONSE_RULES,
+  responseInstructions = DEFAULT_VK_COMMENT_RESPONSE_INSTRUCTIONS,
 ): string {
   const sourceLabel =
     comment.eventType === "post_comment"
@@ -216,19 +194,27 @@ export function formatVkCommentContext(
     );
   }
 
-  return renderVkCommentPromptTemplate(template, {
-    source_label: sourceLabel,
-    sender_id: String(comment.senderId),
-    comment_id: String(comment.commentId),
-    comment_text: comment.text || "(без текста)",
-    origin_type: origin.type,
-    origin_id: String(origin.id),
-    origin_url: origin.url,
-    origin_extra: extraLines.join("\n"),
-    response_rules: responseRules,
-  });
-}
+  const lines = [
+    "Источник обращения:",
+    `ВКонтакте → ${sourceLabel}`,
+    `Автор VK ID: ${comment.senderId}`,
+    `Комментарий ID: ${comment.commentId}`,
+    "",
+    "Комментарий клиента:",
+    comment.text || "(без текста)",
+    "",
+    `Исходный контент: ${origin.type}`,
+    `ID: ${origin.id}`,
+    `Ссылка: ${origin.url}`,
+    ...extraLines,
+  ];
 
+  if (responseInstructions.trim()) {
+    lines.push("", "Инструкция агенту при ответе на комментарий:", responseInstructions.trim());
+  }
+
+  return lines.join("\n");
+}
 export async function sendVkCommentReply(params: {
   token: string;
   comment: VkInboundComment;
