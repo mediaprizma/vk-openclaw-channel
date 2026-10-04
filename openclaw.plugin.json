@@ -17,33 +17,116 @@
       "description": "Канал OpenClaw для сообществ ВКонтакте через Bots Long Poll API.",
       "uiHints": {
         "systemPrompt": {
-          "label": "System prompt",
-          "help": "Trusted instructions injected into every VK turn.",
-          "placeholder": "Instructions for the VK agent…",
+          "label": "Инструкция для агента",
+          "help": "Инструкция, которая добавляется к каждому обращению из ВКонтакте.",
+          "placeholder": "Например: отвечай кратко и вежливо, не придумывай информацию…"
           "advanced": false
         },
         "commentPromptTemplate": {
-          "label": "VK comment prompt template",
-          "help": "Template used for every VK wall, clip or video comment. Leave empty to use the built-in template.",
+          "label": "Шаблон контекста комментария VK",
+          "help": "Шаблон текста, который передаётся агенту при каждом комментарии VK. Оставьте пустым, чтобы использовать стандартный шаблон.",
           "placeholder": "Источник обращения:\nВКонтакте → {{source_label}}\nАвтор VK ID: {{sender_id}}\nКомментарий ID: {{comment_id}}\n\nКомментарий клиента:\n{{comment_text}}\n\nИсходный контент: {{origin_type}}\nID: {{origin_id}}\nСсылка: {{origin_url}}\n{{origin_extra}}\n\nПравило ответа:\n{{response_rules}}",
           "advanced": false
         },
         "commentResponseRules": {
-          "label": "VK comment response rules",
-          "help": "Rules appended to every VK comment context under «Правило ответа». Leave empty to use the built-in rules.",
-          "placeholder": "Если вопрос можно решить публично — отвечай в текущем комментарии.\nЕсли для расчёта или консультации нужны персональные детали, предложи клиенту написать в личные сообщения.\nНе утверждай, что можешь написать клиенту первым в личные сообщения, если это не подтверждено успешной доставкой.",
+          "label": "Правила ответа на комментарии VK",
+          "help": "Дополнительные правила, которые передаются агенту при обработке комментариев VK. Оставьте пустым, если дополнительные правила не нужны.",
+          "placeholder": "Например: Если вопрос можно решить публично — отвечай в комментарии. Если нужны персональные данные — предложи написать в личные сообщения.",
           "advanced": false
         },
+        "token": {
+          "label": "Токен сообщества VK",
+          "help": "Ключ доступа сообщества ВКонтакте для работы через Bots Long Poll API.",
+          "sensitive": true,
+          "advanced": false
+        },
+        "diagnostics.level": {
+          "label": "Уровень диагностики",
+          "help": "Количество диагностической информации, записываемой в журнал OpenClaw.",
+          "advanced": true
+        },
+        "comments.enabled": {
+          "label": "Обрабатывать комментарии",
+          "help": "Включить получение и обработку комментариев VK.",
+          "advanced": false
+        },
+        "comments.postComments": {
+          "label": "Комментарии к записям",
+          "help": "Обрабатывать комментарии к записям сообщества.",
+          "advanced": false
+        },
+        "comments.clipComments": {
+          "label": "Комментарии к Клипа́м",
+          "help": "Обрабатывать комментарии к VK Кли́пам.",
+          "advanced": false
+        },
+        "comments.videoComments": {
+          "label": "Комментарии к видео",
+          "help": "Обрабатывать комментарии к обычным видео VK.",
+          "advanced": false
+        },
+        "contextVisibility": {
+          "label": "Видимость общего контекста",
+          "help": "Определяет, какие пересланные сообщения и цитаты доступны агенту в групповых чатах.",
+          "advanced": true
+        },
+        "audio.maxVoiceMs": {
+          "label": "Максимальная длительность голосового сообщения",
+          "help": "Максимальная длительность одного голосового сообщения в миллисекундах.",
+          "advanced": true
+        },
+        "audio.splitDeadlineMs": {
+          "label": "Лимит разделения голосового сообщения",
+          "help": "Общий лимит времени на обработку и разделение голосового сообщения.",
+          "advanced": true
+        },
+        "audio.splitTimeoutMs": {
+          "label": "Таймаут обработки аудио",
+          "help": "Максимальное время одной операции ffmpeg/ffprobe.",
+          "advanced": true
+        },
+        "audio.maxInputBytes": {
+          "label": "Максимальный размер аудиофайла",
+          "help": "Файлы больше этого размера не обрабатываются.",
+          "advanced": true
+        },
+        "audio.maxSegments": {
+          "label": "Максимальное количество частей",
+          "help": "Максимальное количество частей после разделения голосового сообщения.",
+          "advanced": true
+        },
+        "audio.remoteMaxBytes": {
+          "label": "Максимальный размер удалённого аудио",
+          "help": "Максимальный размер медиафайла, загружаемого по удалённой ссылке.",
+          "advanced": true
+        },
+        "streaming.mode": {
+          "label": "Режим отображения выполнения",
+          "help": "Показывать промежуточные шаги агента в одном редактируемом сообщении.",
+          "advanced": true
+        },
+        "accounts.*.commentPromptTemplate": {
+          "label": "Шаблон контекста комментария для аккаунта",
+          "help": "Шаблон контекста комментария для этого аккаунта VK. Имеет приоритет над общим шаблоном.",
+          "placeholder": "Оставьте пустым, чтобы использовать общий шаблон.",
+          "advanced": true
+        },
+        "accounts.*.commentResponseRules": {
+          "label": "Правила ответа для аккаунта",
+          "help": "Дополнительные правила ответа на комментарии для этого аккаунта. Пустое значение означает отсутствие дополнительных правил.",
+          "placeholder": "Например: отвечай кратко; если нужен расчёт — предложи личные сообщения.",
+          "advanced": true
+        },
         "accounts.*.systemPrompt": {
-          "label": "Account system prompt",
-          "help": "System prompt for this VK account. It overrides the channel-wide prompt.",
-          "placeholder": "Instructions for this VK account…",
+          "label": "Инструкция для аккаунта VK",
+          "help": "Инструкция для этого аккаунта VK. Имеет приоритет над общей инструкцией канала.",
+          "placeholder": "Например: отвечай от имени этого сообщества в заданном стиле…"
           "advanced": false
         },
         "groups.*.systemPrompt": {
-          "label": "Group system prompt",
-          "help": "Additional trusted instructions for this VK group.",
-          "placeholder": "Instructions for this VK group…",
+          "label": "Инструкция для группы VK",
+          "help": "Дополнительная инструкция для этой группы VK.",
+          "placeholder": "Например: учитывай особенности этой группы при ответах…"
           "advanced": true
         }
       },
@@ -212,7 +295,7 @@
           },
           "commentResponseRules": {
             "type": "string",
-            "description": "Rules appended under «Правило ответа» for every VK comment. Leave empty to use the built-in rules."
+            "description": "Дополнительные правила под блоком «Правило ответа» для каждого комментария VK. Пустое значение означает, что дополнительные правила не добавляются."
           },
           "audio": {
             "type": "object",
