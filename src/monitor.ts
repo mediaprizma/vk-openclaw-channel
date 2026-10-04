@@ -648,7 +648,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
           // intentionally works with the raw VK object.
           if (eventType === "wall_reply_new") {
             try {
-              const comment = await resolveVkWallComment(vk, update.object);
+              const comment = await resolveVkWallComment(vk, update.object, account.config.comments?.includePostText === true);
               if (!comment) {
                 opts.runtime.log?.(`[${opts.accountId}] VK wall_reply_new ignored: invalid payload`);
                 return;
