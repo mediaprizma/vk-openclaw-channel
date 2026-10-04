@@ -58,9 +58,8 @@ export function isVkCommentEventType(value: string): value is VkCommentEventType
 }
 
 export async function resolveVkWallComment(
-  vk: VK,
+  _vk: VK,
   rawComment: unknown,
-  includePostText = false,
 ): Promise<VkInboundComment | null> {
   const comment = asRecord(rawComment);
   if (!comment) return null;
@@ -75,32 +74,11 @@ export async function resolveVkWallComment(
     return null;
   }
 
-  let postText: string | undefined;
-  if (includePostText) {
-    try {
-      const response = await vk.api.wall.getById({
-        posts: `${ownerId}_${postId}`,
-      } as never);
-      // vk-io unwraps VK API's "response". Without extended=1, wall.getById
-      // returns the post list directly, not { items: [...] }.
-      const items = Array.isArray(response)
-        ? response
-        : Array.isArray((response as { items?: unknown[] }).items)
-          ? (response as { items: unknown[] }).items
-          : [];
-      const post = asRecord(items[0]);
-      postText = readString(post?.text);
-    } catch {
-      postText = undefined;
-    }
-  }
-
   const origin: VkPostOrigin = {
     type: "post",
     ownerId,
     id: postId,
     url: buildPostUrl(ownerId, postId),
-    ...(postText ? { text: postText } : {}),
     media: [],
   };
 
