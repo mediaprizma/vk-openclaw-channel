@@ -141,7 +141,7 @@ describe("VK comments", () => {
     const text = formatVkCommentContext(comment);
     expect(text).toContain("ВКонтакте → комментарий к записи");
     expect(text).toContain("https://vk.com/wall-100_777");
-    expect(text).toContain("Правило ответа:\n");
+    expect(text).not.toContain("Правило ответа:");
   });
 
   it("appends optional VK comment response instructions", () => {
