@@ -82,9 +82,10 @@ describe("VK comments", () => {
   });
 
   it("includes the source wall post text when enabled", async () => {
-    mockVk.api.wall.getById.mockResolvedValueOnce({
-      items: [{ text: "Новая татуировка в стиле реализм" }],
-    });
+    // vk-io returns wall.getById as an array when extended is not requested.
+    mockVk.api.wall.getById.mockResolvedValueOnce([
+      { text: "Новая татуировка в стиле реализм" },
+    ]);
     const result = await resolveVkWallComment(mockVk as never, {
       id: 43,
       owner_id: -100,
