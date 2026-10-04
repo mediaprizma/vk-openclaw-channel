@@ -7,6 +7,7 @@ const mockVk = {
   api: {
     wall: {
       createComment: vi.fn(),
+      getById: vi.fn(),
     },
     video: {
       get: vi.fn(),
@@ -78,6 +79,21 @@ describe("VK comments", () => {
         media: [],
       },
     });
+  });
+
+  it("includes the source wall post text when enabled", async () => {
+    mockVk.api.wall.getById.mockResolvedValueOnce({
+      items: [{ text: "Новая татуировка в стиле реализм" }],
+    });
+    const result = await resolveVkWallComment(mockVk as never, {
+      id: 43,
+      owner_id: -100,
+      post_id: 778,
+      from_id: 123,
+      text: "Что это?",
+    }, true);
+    expect(result?.origin.text).toBe("Новая татуировка в стиле реализм");
+    expect(mockVk.api.wall.getById).toHaveBeenCalledWith({ posts: "-100_778" });
   });
 
   it("resolves a short video comment as a Clip and chooses its largest preview", async () => {
