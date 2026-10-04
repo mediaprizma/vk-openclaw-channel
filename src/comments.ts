@@ -188,7 +188,7 @@ export const DEFAULT_VK_COMMENT_PROMPT_TEMPLATE = [
   "{{response_rules}}",
 ].join("\n");
 
-const DEFAULT_VK_COMMENT_RESPONSE_RULES = [
+export const DEFAULT_VK_COMMENT_RESPONSE_RULES = [
   "Если вопрос можно решить публично — отвечай в текущем комментарии.",
   "Если для расчёта или консультации нужны персональные детали, предложи клиенту написать в личные сообщения.",
   "Не утверждай, что можешь написать клиенту первым в личные сообщения, если это не подтверждено успешной доставкой.",
@@ -201,6 +201,7 @@ function renderVkCommentPromptTemplate(template: string, values: Record<string, 
 export function formatVkCommentContext(
   comment: VkInboundComment,
   template = DEFAULT_VK_COMMENT_PROMPT_TEMPLATE,
+  responseRules = DEFAULT_VK_COMMENT_RESPONSE_RULES,
 ): string {
   const sourceLabel =
     comment.eventType === "post_comment"
@@ -229,7 +230,7 @@ export function formatVkCommentContext(
     origin_id: String(origin.id),
     origin_url: origin.url,
     origin_extra: extraLines.join("\n"),
-    response_rules: DEFAULT_VK_COMMENT_RESPONSE_RULES,
+    response_rules: responseRules,
   });
 }
 
