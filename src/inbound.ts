@@ -281,7 +281,7 @@ export async function handleVkInbound(params: {
   const firstForward = visibleForwards[0];
   const envelopeOptions = core.channel.reply.resolveEnvelopeFormatOptions(config as OpenClawConfig);
   const rawBody = message.comment
-    ? formatVkCommentContext(message.comment, account.config.commentPromptTemplate, account.config.commentResponseRules)
+    ? formatVkCommentContext(message.comment, account.config.commentResponseInstructions)
     : payloadCommand ??
       resolveVkInboundAgentText({
         text: message.text,
