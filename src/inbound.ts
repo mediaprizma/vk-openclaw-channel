@@ -1,5 +1,6 @@
 import { resolveControlCommandGate } from "openclaw/plugin-sdk/command-auth-native";
 import { getReplyPayloadTtsSupplement } from "openclaw/plugin-sdk/reply-payload";
+import { bindIngressLifecycleToReplyOptions } from "openclaw/plugin-sdk/channel-outbound";
 import { isAbortRequestText } from "openclaw/plugin-sdk/reply-runtime";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import type { StreamingCompatEntry } from "./sdk-compat.js";
@@ -188,8 +189,9 @@ export async function handleVkInbound(params: {
   config: CoreConfig;
   runtime: RuntimeEnv;
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number }) => void;
+  turnAdoptionLifecycle?: Parameters<typeof bindIngressLifecycleToReplyOptions>[0];
 }): Promise<void> {
-  const { message, account, config, runtime, statusSink } = params;
+  const { message, account, config, runtime, statusSink, turnAdoptionLifecycle } = params;
   const core = getVkRuntime();
   const isComment = Boolean(message.comment);
   if (isComment && account.config.comments?.enabled === false) {
@@ -870,6 +872,7 @@ export async function handleVkInbound(params: {
   let turnSettled = false;
   try {
     await core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+      ...(turnAdoptionLifecycle ? bindIngressLifecycleToReplyOptions(turnAdoptionLifecycle) : {}),
       ctx: ctxPayload,
       cfg: config as OpenClawConfig,
       dispatcherOptions: {
