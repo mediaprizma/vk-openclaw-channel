@@ -72,6 +72,7 @@ import type {
   VkInboundMessage,
 } from "./types.js";
 import { buildVkCommentTarget } from "./types.js";
+import { consumeVkMasterQuestion, findVkMasterQuestion } from "./master-routing.js";
 
 const CHANNEL_ID = "vk-openclaw-channel" as const;
 
@@ -207,11 +208,15 @@ export async function handleVkInbound(params: {
     isConfiguredMaster &&
     message.adminAuthorId === configuredMasterVkId;
 
-  if (isOperatorMessage && message.peerId === configuredMasterVkId) {
+  const masterQuestion =
+    isOperatorMessage && message.replyToMessageId
+      ? await findVkMasterQuestion(message.replyToMessageId)
+      : undefined;
+  const isMasterReply = Boolean(masterQuestion);
+
+  if (isOperatorMessage && !masterQuestion) {
     runtime.log?.(
-      "vk: drop operator DM from " +
-        redactVkId(configuredMasterVkId) +
-        ": no client peer can be inferred; master must answer inside the client dialog",
+      `vk: drop master message ${redactVkId(message.messageId)}: it is not a Reply to a known agent question`,
     );
     return;
   }
@@ -331,12 +336,13 @@ export async function handleVkInbound(params: {
       "Источник сообщения:",
       "ВКонтакте → мастер/оператор сообщества",
       "VK ID мастера: " + message.adminAuthorId,
-      "Диалог клиента VK ID: " + message.peerId,
+      `VK ID клиента: ${masterQuestion!.clientPeerId}`,
+      `Это ответ мастера на уточняющий вопрос агента из сессии клиента VK ID ${masterQuestion!.clientPeerId}.`,
       "",
       "Сообщение мастера:",
-      agentBody,
+      rawBody,
       "",
-      "Это инструкция мастера. Не создавай отдельную сессию мастера и не отвечай мастеру вместо клиента. Выполни инструкцию в сессии этого клиента.",
+      "Продолжай работу в исходной сессии этого клиента. Не создавай отдельную сессию мастера и не отвечай мастеру в его чат.",
     ].join("\n");
   }
   if (!rawBody) {
@@ -489,17 +495,26 @@ export async function handleVkInbound(params: {
     return;
   }
 
-  // Build route and dispatch
+  // Build route and dispatch. A master Reply is resolved against the client
+  // that originated the quoted agent question, never against the master's DM.
   const peerId = String(message.peerId);
-  const route = core.channel.routing.resolveAgentRoute({
+  const deliveryPeerId = masterQuestion?.clientPeerId ?? message.peerId;
+  const resolvedRoute = core.channel.routing.resolveAgentRoute({
     cfg: config as OpenClawConfig,
     channel: CHANNEL_ID,
     accountId: account.accountId,
     peer: {
       kind: isGroup ? "group" : "direct",
-      id: peerId,
+      id: isMasterReply ? String(masterQuestion!.clientPeerId) : peerId,
     },
   });
+  const route = masterQuestion
+    ? {
+        ...resolvedRoute,
+        agentId: masterQuestion.agentId ?? resolvedRoute.agentId,
+        sessionKey: masterQuestion.sessionKey,
+      }
+    : resolvedRoute;
 
   const fromLabel = isOperatorMessage
     ? "vk:master:" + message.adminAuthorId
@@ -519,16 +534,18 @@ export async function handleVkInbound(params: {
     sessionKey: route.sessionKey,
   });
 
-  const importedHistory = await resolveVkHistoryContext({
-    account,
-    message,
-    sessionExists: previousTimestamp !== undefined,
-    onError: (error) => {
-      runtime.log?.(
-        `VK history import skipped for sender=${redactVkId(message.senderId)}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    },
-  });
+  const importedHistory = isMasterReply
+    ? undefined
+    : await resolveVkHistoryContext({
+        account,
+        message,
+        sessionExists: previousTimestamp !== undefined,
+        onError: (error) => {
+          runtime.log?.(
+            `VK history import skipped for sender=${redactVkId(message.senderId)}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        },
+      });
   if (importedHistory) {
     agentBody = importedHistory + "\n\n" + agentBody;
     runtime.log?.(
@@ -601,7 +618,7 @@ export async function handleVkInbound(params: {
     CommandBody: commandInput,
     BodyForCommands: commandInput,
     From: fromLabel,
-    To: `vk:${peerId}`,
+    To: `vk:${deliveryPeerId}`,
     SessionKey: route.sessionKey,
     AccountId: route.accountId,
     ChatType: isGroup ? "group" : "direct",
@@ -633,7 +650,7 @@ export async function handleVkInbound(params: {
           },
           senderId: message.comment.senderId,
         })
-      : `vk:${peerId}`,
+      : `vk:${deliveryPeerId}`,
     CommandAuthorized: commandGate.commandAuthorized,
     media: media.length > 0 ? media : undefined,
     ...(isQuoteVisible && {
@@ -677,14 +694,14 @@ export async function handleVkInbound(params: {
   const typingCallbacks = createTypingCallbacks({
     start: async () => {
       if (!isComment) {
-        await sendTypingVk(String(message.peerId), account);
+        await sendTypingVk(String(deliveryPeerId), account);
       }
     },
     onStartError: (err) => {
       logTypingFailure({
         log: (line) => runtime.log?.(line),
         channel: CHANNEL_ID,
-        target: redactVkId(message.peerId),
+        target: redactVkId(deliveryPeerId),
         error: err,
       });
     },
@@ -712,6 +729,10 @@ export async function handleVkInbound(params: {
       runtime.error?.(`vk: failed updating session meta: ${String(err)}`);
     },
   });
+
+  if (isMasterReply && masterQuestion) {
+    await consumeVkMasterQuestion(masterQuestion.messageId);
+  }
 
   if (!isComment) {
     try {
@@ -828,7 +849,7 @@ export async function handleVkInbound(params: {
     }
     const [chunk] = renderVkMarkdownChunks(source);
     try {
-      await editMessageVk(String(message.peerId), draftMsgId, chunk?.text ?? source, account, {
+      await editMessageVk(String(deliveryPeerId), draftMsgId, chunk?.text ?? source, account, {
         formatData: chunk?.formatData,
       });
       vkDiag("draft kept as answer", { len: (chunk?.text ?? source).length });
@@ -857,7 +878,7 @@ export async function handleVkInbound(params: {
     // direct chat, as there, nothing is quoted.
     const draftReplyTo = payloadCommand || isGroup ? message.messageId : undefined;
     progressDraft = createVkProgressDraftCompositor({
-      to: String(message.peerId),
+      to: String(deliveryPeerId),
       account,
       accountId: account.accountId,
       cfg: config as CoreConfig,
@@ -885,7 +906,7 @@ export async function handleVkInbound(params: {
   // a fresh draft below the question.
   const unregisterDraftHandoff = progressDraft
     ? registerVkDraftQuestionHandoff(
-        { accountId: account.accountId, peerId: message.peerId },
+        { accountId: account.accountId, peerId: deliveryPeerId },
         async () => {
           if (!progressDraft || turnSettled) {
             return;
@@ -1123,7 +1144,7 @@ export async function handleVkInbound(params: {
                 let edited = false;
                 try {
                   edited = await editMessageVk(
-                    String(message.peerId),
+                    String(deliveryPeerId),
                     draftMsgId,
                     chunks[0].text,
                     account,
@@ -1153,7 +1174,7 @@ export async function handleVkInbound(params: {
                     // The tail of a long answer goes as ordinary messages: VK
                     // cannot hold more than ~4096 characters in one bubble.
                     for (const chunk of chunks.slice(1)) {
-                      await sendMessageVk(String(message.peerId), chunk.text, {
+                      await sendMessageVk(String(deliveryPeerId), chunk.text, {
                         accountId: account.accountId,
                       });
                     }
@@ -1163,7 +1184,7 @@ export async function handleVkInbound(params: {
                     if (markdownAttachments.attachments.length > 0) {
                       await deliverVkReply({
                         payload: { text: markdownAttachments.attachments.join("\n") },
-                        peerId: message.peerId,
+                        peerId: deliveryPeerId,
                         accountId: account.accountId,
                         statusSink,
                       });
@@ -1180,7 +1201,7 @@ export async function handleVkInbound(params: {
                       for (const media of mediaList) {
                         await deliverVkReply({
                           payload: { ...normalized, text: "", mediaUrl: media, mediaUrls: undefined },
-                          peerId: message.peerId,
+                          peerId: deliveryPeerId,
                           accountId: account.accountId,
                           statusSink,
                         });
@@ -1214,7 +1235,7 @@ export async function handleVkInbound(params: {
           if (!keepsDraftAnswer || leftToSend) {
             const delivered = await deliverVkReply({
               payload: outboundPayload,
-              peerId: message.peerId,
+              peerId: deliveryPeerId,
               accountId: account.accountId,
               statusSink,
               clearKeyboard:

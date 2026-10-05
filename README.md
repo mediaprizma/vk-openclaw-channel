@@ -6,6 +6,14 @@
 
 > Этот репозиторий является независимым проектом, который развивается и поддерживается **mediaprizma**.
 
+## Shared master/operator chat
+
+Set `masterVkId` to the VK user id of the human master. Each client keeps its own OpenClaw session. When an agent sends a clarification question to the master's VK DM, the plugin records the real VK outbound `message_id` together with the originating client session. The master can then use VK's native **Reply** action on that exact question.
+
+The reply is authenticated by `masterVkId`, correlated by the replied-to VK `message_id`, injected into the original client session, and the agent's next response is delivered back to that client. Questions from multiple client sessions can coexist in the same master chat.
+
+A master message without **Reply** to a known agent question is intentionally ignored because it has no unambiguous client session.
+
 ## Требования
 
 - OpenClaw **2026.9.x или новее**
