@@ -331,18 +331,16 @@ export async function handleVkInbound(params: {
     ? inboundSurfaceContext + "\n\n" + rawBody
     : rawBody;
 
-  if (isOperatorMessage) {
+  if (isOperatorMessage && masterQuestion) {
     agentBody = [
       "Источник сообщения:",
       "ВКонтакте → мастер/оператор сообщества",
-      "VK ID мастера: " + message.adminAuthorId,
-      `VK ID клиента: ${masterQuestion!.clientPeerId}`,
-      `Это ответ мастера на уточняющий вопрос агента из сессии клиента VK ID ${masterQuestion!.clientPeerId}.`,
+      "VK ID мастера: " + configuredMasterVkId,
+      `VK ID клиента: ${masterQuestion.clientPeerId}`,
+      "Это ответ мастера на уточняющий вопрос агента.",
       "",
       "Сообщение мастера:",
       rawBody,
-      "",
-      "Продолжай работу в исходной сессии этого клиента. Не создавай отдельную сессию мастера и не отвечай мастеру в его чат.",
     ].join("\n");
   }
   if (!rawBody) {
