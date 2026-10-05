@@ -7,6 +7,8 @@ import { createStallWatchdog, type StallWatchdog } from "./stall-watchdog.js";
 import { resolveVkAccount } from "./accounts.js";
 import { redactVkId } from "./diagnostics.js";
 import { handleVkInbound } from "./inbound.js";
+import { createVkDurableIngress } from "./ingress.js";
+import { recoverVkUnreadHistory } from "./history.js";
 import { resolveVkVideoComment, resolveVkWallComment } from "./comments.js";
 import {
   extractVkInboundAttachments,
@@ -53,6 +55,13 @@ function resolveTransportSilenceMs(config: VkAccountConfig): number {
   return parseStrictPositiveInteger(config.transport?.silenceMs) ?? DEFAULT_TRANSPORT_SILENCE_MS;
 }
 
+type VkLongPollCursor = {
+  groupId: number;
+  server: string;
+  key: string;
+  ts: string;
+};
+
 class BotsLongPollTransport {
   private started = false;
   private ts = "";
@@ -67,17 +76,26 @@ class BotsLongPollTransport {
   private readonly groupId: number;
   private readonly onPollCompleted: () => void;
   private readonly onUpdate: (update: Record<string, unknown>) => Promise<unknown> | unknown;
+  private readonly loadCursor: () => Promise<VkLongPollCursor | undefined>;
+  private readonly saveCursor: (cursor: VkLongPollCursor) => Promise<void>;
+  private readonly onCursorReset: () => Promise<void>;
 
   constructor(params: {
     api: VK["api"];
     groupId: number;
     onPollCompleted: () => void;
     onUpdate: (update: Record<string, unknown>) => Promise<unknown> | unknown;
+    loadCursor: () => Promise<VkLongPollCursor | undefined>;
+    saveCursor: (cursor: VkLongPollCursor) => Promise<void>;
+    onCursorReset: () => Promise<void>;
   }) {
     this.api = params.api;
     this.groupId = params.groupId;
     this.onPollCompleted = params.onPollCompleted;
     this.onUpdate = params.onUpdate;
+    this.loadCursor = params.loadCursor;
+    this.saveCursor = params.saveCursor;
+    this.onCursorReset = params.onCursorReset;
     this.firstSuccessfulPoll = new Promise<void>((resolve, reject) => {
       this.resolveFirstSuccessfulPoll = resolve;
       this.rejectFirstSuccessfulPoll = reject;
@@ -102,9 +120,7 @@ class BotsLongPollTransport {
     return this.firstSuccessfulPoll.finally(() => clearTimeout(timeout));
   }
 
-  async start(): Promise<void> {
-    if (this.started) throw new Error("VK Bots Long Poll already started");
-
+  private async refreshServer(keepTs: boolean, persist = true): Promise<void> {
     const response = await this.api.groups.getLongPollServer({
       group_id: this.groupId,
     });
@@ -115,7 +131,37 @@ class BotsLongPollTransport {
 
     this.serverUrl = new URL(data.server);
     this.key = data.key;
-    this.ts = String(data.ts);
+    if (!keepTs) {
+      this.ts = String(data.ts);
+    }
+    if (persist) {
+      await this.saveCursor({
+        groupId: this.groupId,
+        server: data.server,
+        key: data.key,
+        ts: this.ts,
+      });
+    }
+  }
+
+  async start(): Promise<void> {
+    if (this.started) throw new Error("VK Bots Long Poll already started");
+
+    const persisted = await this.loadCursor();
+    if (
+      persisted &&
+      persisted.groupId === this.groupId &&
+      persisted.server &&
+      persisted.key &&
+      persisted.ts
+    ) {
+      this.serverUrl = new URL(persisted.server);
+      this.key = persisted.key;
+      this.ts = persisted.ts;
+    } else {
+      await this.refreshServer(false);
+    }
+
     this.started = true;
     this.loopPromise = this.runLoop();
   }
@@ -133,22 +179,16 @@ class BotsLongPollTransport {
       } catch (error) {
         if (!this.started) break;
         const message = error instanceof Error ? error.message : String(error);
-        // A Long Poll server error requires a fresh server/key/ts.
+        // Network/HTTP failures are retried with the same durable ts. Refreshing
+        // the server is safe only when we explicitly preserve that ts.
         try {
-          const response = await this.api.groups.getLongPollServer({
-            group_id: this.groupId,
-          });
-          const data = response as { server?: string; key?: string; ts?: string | number };
-          if (!data.server || !data.key || data.ts === undefined) {
-            throw new Error("VK groups.getLongPollServer returned an incomplete response");
-          }
-          this.serverUrl = new URL(data.server);
-          this.key = data.key;
-          this.ts = String(data.ts);
+          await this.refreshServer(true);
         } catch (refreshError) {
           const refreshMessage =
             refreshError instanceof Error ? refreshError.message : String(refreshError);
-          throw new Error(`VK Bots Long Poll restart failed: ${refreshMessage}; original: ${message}`);
+          throw new Error(
+            `VK Bots Long Poll restart failed: ${refreshMessage}; original: ${message}`,
+          );
         }
         await new Promise<void>((resolve) => setTimeout(resolve, 1000));
       }
@@ -195,22 +235,68 @@ class BotsLongPollTransport {
     if ("failed" in result) {
       if (result.failed === 1 && "ts" in result) {
         this.ts = String(result.ts);
+        await this.saveCursor({
+          groupId: this.groupId,
+          server: this.serverUrl.toString(),
+          key: this.key,
+          ts: this.ts,
+        });
         this.onPollCompleted();
         return;
       }
-      throw new Error(`VK Long Poll failed=${result.failed}${"error" in result && result.error ? ` ${result.error}` : ""}`);
+      if (result.failed === 2) {
+        await this.refreshServer(true);
+        return;
+      }
+      if (result.failed === 3) {
+        // VK explicitly tells us the cursor is too old. A fresh ts is required,
+        // but the new cursor is NOT durable until history reconciliation succeeds.
+        const previousTs = this.ts;
+        await this.refreshServer(false, false);
+        try {
+          await this.onCursorReset();
+        } catch (error) {
+          // Keep the last durable cursor. The next loop will retry with the new
+          // server/key but the old ts, rather than acknowledging the gap.
+          this.ts = previousTs;
+          throw error;
+        }
+        await this.saveCursor({
+          groupId: this.groupId,
+          server: this.serverUrl.toString(),
+          key: this.key,
+          ts: this.ts,
+        });
+        return;
+      }
+      throw new Error(
+        `VK Long Poll failed=${result.failed}${"error" in result && result.error ? ` ${result.error}` : ""}`,
+      );
     }
 
-    this.ts = String(result.ts);
+    const nextTs = String(result.ts);
     this.settleReadinessSuccess();
     this.onPollCompleted();
 
+    // IMPORTANT: do not advance the durable transport cursor until every update
+    // has been durably admitted. If the process dies after this point, the saved
+    // ts still points before the batch and VK will replay it on restart. The
+    // ingress queue's event ids make that replay idempotent.
     for (const update of result.updates ?? []) {
       if (!update || typeof update !== "object" || Array.isArray(update)) continue;
       await this.onUpdate(update as Record<string, unknown>);
     }
+
+    this.ts = nextTs;
+    await this.saveCursor({
+      groupId: this.groupId,
+      server: this.serverUrl.toString(),
+      key: this.key,
+      ts: this.ts,
+    });
   }
 }
+
 
 
 /**
@@ -426,6 +512,51 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     await stopPromise;
   };
 
+  const cursorStore = core.state.openKeyedStore<VkLongPollCursor>({
+    namespace: "vk.longpoll-cursor",
+    maxEntries: 64,
+    overflowPolicy: "reject-new",
+  });
+  const cursorKey = account.accountId;
+
+  const durableIngress = createVkDurableIngress({
+    account,
+    runtime: opts.runtime,
+    abortSignal: stopSignal,
+    handleMessage: async (message, lifecycle) => {
+      const currentCfg = readVkRuntimeConfig(core);
+      const currentAccount = resolveVkAccount({
+        cfg: currentCfg,
+        accountId: account.accountId,
+      });
+      await handleVkInbound({
+        message,
+        account: currentAccount,
+        config: currentCfg,
+        runtime: opts.runtime,
+        turnAdoptionLifecycle: lifecycle,
+      });
+    },
+    resolveWallComment: async (object) => {
+      const comment = await resolveVkWallComment(vk, object);
+      if (!comment) return null;
+      if (!isVkCommentEnabled(account.config, "post")) return null;
+      const ownGroup = await resolveVkOwnGroup(opts.token);
+      if (ownGroup && comment.senderId === -ownGroup.id) return null;
+      return commentMessageFromContext(comment);
+    },
+    resolveVideoComment: async (object) => {
+      const comment = await resolveVkVideoComment(vk, object);
+      if (!comment) return null;
+      const kind = comment.eventType === "clip_comment" ? "clip" : "video";
+      if (!isVkCommentEnabled(account.config, kind)) return null;
+      const ownGroup = await resolveVkOwnGroup(opts.token);
+      if (ownGroup && comment.senderId === -ownGroup.id) return null;
+      return commentMessageFromContext(comment);
+    },
+  });
+
+
   // Ensure gateway stop triggers VK polling shutdown.
   opts.abortSignal?.addEventListener("abort", () => {
     void stopUpdates();
@@ -484,21 +615,15 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     opts.setStatus?.({ lastEventAt: Date.now() });
 
     try {
-      const currentCfg = readVkRuntimeConfig(core);
-      const currentAccount = resolveVkAccount({
-        cfg: currentCfg,
-        accountId: account.accountId,
-      });
-
-      await handleVkInbound({
+      await durableIngress.enqueue({
+        version: 1,
+        kind: "message",
         message,
-        account: currentAccount,
-        config: currentCfg,
-        runtime: opts.runtime,
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       opts.runtime.error?.(`vk: message handler error for peerId=${redactVkId(peerId)}: ${errorMessage}`);
+      throw err;
     }
   });
 
@@ -527,11 +652,14 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       opts.runtime.log?.(
         `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.postId}`,
       );
-      const currentCfg = readVkRuntimeConfig(core);
-      const currentAccount = resolveVkAccount({ cfg: currentCfg, accountId: account.accountId });
-      await handleVkInbound({ message, account: currentAccount, config: currentCfg, runtime: opts.runtime });
+      await durableIngress.enqueue({
+        version: 1,
+        kind: "message",
+        message,
+      });
     } catch (err) {
       opts.runtime.error?.(`vk: wall_reply_new handler error: ${String(err)}`);
+      throw err;
     }
   });
 
@@ -559,11 +687,14 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       opts.runtime.log?.(
         `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.videoId}`,
       );
-      const currentCfg = readVkRuntimeConfig(core);
-      const currentAccount = resolveVkAccount({ cfg: currentCfg, accountId: account.accountId });
-      await handleVkInbound({ message, account: currentAccount, config: currentCfg, runtime: opts.runtime });
+      await durableIngress.enqueue({
+        version: 1,
+        kind: "message",
+        message,
+      });
     } catch (err) {
       opts.runtime.error?.(`vk: video_comment_new handler error: ${String(err)}`);
+      throw err;
     }
   });
 
@@ -588,6 +719,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
   });
 
   try {
+    durableIngress.start();
     // Detect whether Bots LP is available; fall back to User LP otherwise
     const botsLp = await canUseBotsLongPoll(vk);
     if (stopRequested || opts.abortSignal?.aborted) {
@@ -637,6 +769,34 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
             opts.setStatus?.({ lastTransportActivityAt: Date.now() });
           }
         },
+        loadCursor: async () => {
+          return await cursorStore.lookup(cursorKey);
+        },
+        saveCursor: async (cursor) => {
+          await cursorStore.register(cursorKey, cursor);
+        },
+        onCursorReset: async () => {
+          const recovered = await recoverVkUnreadHistory({
+            account,
+            enqueue: async (message) => {
+              await durableIngress.enqueue({
+                version: 1,
+                kind: "message",
+                message,
+              });
+            },
+            onError: (error) => {
+              opts.runtime.error?.(
+                `vk: Long Poll cursor reset history recovery failed: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            },
+          });
+          if (recovered > 0) {
+            opts.runtime.log?.(
+              `[${opts.accountId}] VK recovered ${recovered} unread message(s) after Long Poll cursor reset`,
+            );
+          }
+        },
         onUpdate: async (update) => {
           const eventType = typeof update.type === "string" ? update.type : "unknown";
           opts.runtime.log?.(`[${opts.accountId}] VK Long Poll update: ${eventType}`);
@@ -647,81 +807,29 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
           // raw payload behind a protected field, while our comment resolver
           // intentionally works with the raw VK object.
           if (eventType === "wall_reply_new") {
-            try {
-              const comment = await resolveVkWallComment(vk, update.object);
-              if (!comment) {
-                opts.runtime.log?.(`[${opts.accountId}] VK wall_reply_new ignored: invalid payload`);
-                return;
-              }
-              const kind = comment.eventType === "clip_comment" ? "clip" : "post";
-              if (!isVkCommentEnabled(account.config, kind)) return;
-              const ownGroup = await resolveVkOwnGroup(opts.token);
-              if (ownGroup && comment.senderId === -ownGroup.id) return;
-              const message = commentMessageFromContext(comment);
-              if (!message) return;
-
-              opts.setStatus?.({ lastEventAt: Date.now() });
-              core.channel.activity.record({
-                channel: "vk-openclaw-channel",
-                accountId: account.accountId,
-                direction: "inbound",
-                at: message.timestamp,
-              });
-              opts.runtime.log?.(
-                `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.postId}`,
-              );
-              const currentCfg = readVkRuntimeConfig(core);
-              const currentAccount = resolveVkAccount({ cfg: currentCfg, accountId: account.accountId });
-              await handleVkInbound({
-                message,
-                account: currentAccount,
-                config: currentCfg,
-                runtime: opts.runtime,
-              });
-            } catch (err) {
-              opts.runtime.error?.(`vk: wall_reply_new handler error: ${String(err)}`);
+            if (!update.object || typeof update.object !== "object" || Array.isArray(update.object)) {
+              opts.runtime.log?.(`[${opts.accountId}] VK wall_reply_new ignored: invalid raw payload`);
+              return;
             }
+            await durableIngress.enqueue({
+              version: 1,
+              kind: "wall_reply_new",
+              object: update.object as Record<string, unknown>,
+            });
             return;
           }
-
           if (eventType === "video_comment_new") {
-            try {
-              const comment = await resolveVkVideoComment(vk, update.object);
-              if (!comment) {
-                opts.runtime.log?.(`[${opts.accountId}] VK video_comment_new ignored: invalid payload`);
-                return;
-              }
-              const kind = comment.eventType === "clip_comment" ? "clip" : "video";
-              if (!isVkCommentEnabled(account.config, kind)) return;
-              const ownGroup = await resolveVkOwnGroup(opts.token);
-              if (ownGroup && comment.senderId === -ownGroup.id) return;
-              const message = commentMessageFromContext(comment);
-              if (!message) return;
-
-              opts.setStatus?.({ lastEventAt: Date.now() });
-              core.channel.activity.record({
-                channel: "vk-openclaw-channel",
-                accountId: account.accountId,
-                direction: "inbound",
-                at: message.timestamp,
-              });
-              opts.runtime.log?.(
-                `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.videoId}`,
-              );
-              const currentCfg = readVkRuntimeConfig(core);
-              const currentAccount = resolveVkAccount({ cfg: currentCfg, accountId: account.accountId });
-              await handleVkInbound({
-                message,
-                account: currentAccount,
-                config: currentCfg,
-                runtime: opts.runtime,
-              });
-            } catch (err) {
-              opts.runtime.error?.(`vk: video_comment_new handler error: ${String(err)}`);
+            if (!update.object || typeof update.object !== "object" || Array.isArray(update.object)) {
+              opts.runtime.log?.(`[${opts.accountId}] VK video_comment_new ignored: invalid raw payload`);
+              return;
             }
+            await durableIngress.enqueue({
+              version: 1,
+              kind: "video_comment_new",
+              object: update.object as Record<string, unknown>,
+            });
             return;
           }
-
           await vk.updates.handleWebhookUpdate(update);
         },
       });
@@ -783,6 +891,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
   } finally {
     try {
       await stopUpdates();
+      await durableIngress.stop();
     } finally {
       // Unconditional: a failed start never armed the watchdog, so nothing else
       // would ever stop it, and each retry would leave another interval behind.

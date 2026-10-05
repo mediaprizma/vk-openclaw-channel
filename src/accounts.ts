@@ -11,6 +11,7 @@ function mergeVkAccountConfig(cfg: CoreConfig, accountId: string): VkAccountConf
   const base: VkAccountConfig = {
     name: vkConfig.name,
     enabled: vkConfig.enabled,
+    masterVkId: vkConfig.masterVkId,
     token: vkConfig.token,
     tokenFile: vkConfig.tokenFile,
     dmPolicy: vkConfig.dmPolicy,
@@ -31,6 +32,7 @@ function mergeVkAccountConfig(cfg: CoreConfig, accountId: string): VkAccountConf
     return {
       ...base,
       ...accountConfig,
+      masterVkId: accountConfig.masterVkId ?? base.masterVkId,
       // Merge groups from base and account
       groups: { ...base.groups, ...accountConfig.groups },
     };
