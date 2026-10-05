@@ -72,7 +72,7 @@ import type {
   VkInboundMessage,
 } from "./types.js";
 import { buildVkCommentTarget } from "./types.js";
-import { findVkMasterQuestion } from "./master-routing.js";
+import { consumeVkMasterQuestion, findVkMasterQuestion } from "./master-routing.js";
 
 const CHANNEL_ID = "vk-openclaw-channel" as const;
 
@@ -729,6 +729,10 @@ export async function handleVkInbound(params: {
       runtime.error?.(`vk: failed updating session meta: ${String(err)}`);
     },
   });
+
+  if (isMasterReply && masterQuestion) {
+    await consumeVkMasterQuestion(masterQuestion.messageId);
+  }
 
   if (!isComment) {
     try {
