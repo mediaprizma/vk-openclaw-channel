@@ -107,7 +107,11 @@ export async function resolveVkVideoComment(
   vk: VK,
   rawComment: unknown,
 ): Promise<VkInboundComment | null> {
-  const comment = asRecord(rawComment);
+  // Accept both the normalized vk-io object and a preserved VK event envelope.
+  const envelope = asRecord(rawComment);
+  const comment =
+    asRecord(envelope?.object) ??
+    envelope;
   if (!comment) return null;
 
   const id = readInt(comment.id);
