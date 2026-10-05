@@ -105,6 +105,8 @@ export type VkInboundComment = {
 export type VkAccountConfig = {
   name?: string;
   enabled?: boolean;
+  /** VK user id of the master/operator. Operator messages are routed into the related client conversation. */
+  masterVkId?: string | number;
   /** Community token, or a SecretRef the host resolves into one. */
   token?: string | VkSecretRef;
   tokenFile?: string;
