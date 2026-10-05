@@ -7,7 +7,7 @@ import { createStallWatchdog, type StallWatchdog } from "./stall-watchdog.js";
 import { resolveVkAccount } from "./accounts.js";
 import { redactVkId } from "./diagnostics.js";
 import { handleVkInbound } from "./inbound.js";
-import { createVkDurableIngress, type VkIngressEvent } from "./ingress.js";
+import { createVkDurableIngress } from "./ingress.js";
 import { resolveVkVideoComment, resolveVkWallComment } from "./comments.js";
 import {
   extractVkInboundAttachments,
