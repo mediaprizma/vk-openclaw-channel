@@ -8,6 +8,7 @@ import { resolveVkAccount } from "./accounts.js";
 import { redactVkId } from "./diagnostics.js";
 import { handleVkInbound } from "./inbound.js";
 import { createVkDurableIngress } from "./ingress.js";
+import { recoverVkUnreadHistory } from "./history.js";
 import { resolveVkVideoComment, resolveVkWallComment } from "./comments.js";
 import {
   extractVkInboundAttachments,
@@ -77,6 +78,7 @@ class BotsLongPollTransport {
   private readonly onUpdate: (update: Record<string, unknown>) => Promise<unknown> | unknown;
   private readonly loadCursor: () => Promise<VkLongPollCursor | undefined>;
   private readonly saveCursor: (cursor: VkLongPollCursor) => Promise<void>;
+  private readonly onCursorReset: () => Promise<void>;
 
   constructor(params: {
     api: VK["api"];
@@ -85,6 +87,7 @@ class BotsLongPollTransport {
     onUpdate: (update: Record<string, unknown>) => Promise<unknown> | unknown;
     loadCursor: () => Promise<VkLongPollCursor | undefined>;
     saveCursor: (cursor: VkLongPollCursor) => Promise<void>;
+    onCursorReset: () => Promise<void>;
   }) {
     this.api = params.api;
     this.groupId = params.groupId;
@@ -92,6 +95,7 @@ class BotsLongPollTransport {
     this.onUpdate = params.onUpdate;
     this.loadCursor = params.loadCursor;
     this.saveCursor = params.saveCursor;
+    this.onCursorReset = params.onCursorReset;
     this.firstSuccessfulPoll = new Promise<void>((resolve, reject) => {
       this.resolveFirstSuccessfulPoll = resolve;
       this.rejectFirstSuccessfulPoll = reject;
@@ -244,9 +248,9 @@ class BotsLongPollTransport {
       }
       if (result.failed === 3) {
         // VK explicitly tells us the cursor is too old. A fresh ts is required;
-        // the history reconciliation layer is the fallback for messages missed
-        // across this transport-level reset.
+        // reconcile unread message history before accepting the new cursor.
         await this.refreshServer(false);
+        await this.onCursorReset();
         return;
       }
       throw new Error(
@@ -745,6 +749,28 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
         },
         saveCursor: async (cursor) => {
           await cursorStore.register(cursorKey, cursor);
+        },
+        onCursorReset: async () => {
+          const recovered = await recoverVkUnreadHistory({
+            account,
+            enqueue: async (message) => {
+              await durableIngress.enqueue({
+                version: 1,
+                kind: "message",
+                message,
+              });
+            },
+            onError: (error) => {
+              opts.runtime.error?.(
+                `vk: Long Poll cursor reset history recovery failed: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            },
+          });
+          if (recovered > 0) {
+            opts.runtime.log?.(
+              `[opts.accountId] VK recovered ${recovered} unread message(s) after Long Poll cursor reset`,
+            );
+          }
         },
         onUpdate: async (update) => {
           const eventType = typeof update.type === "string" ? update.type : "unknown";
