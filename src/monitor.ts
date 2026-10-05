@@ -768,7 +768,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
           });
           if (recovered > 0) {
             opts.runtime.log?.(
-              `[opts.accountId] VK recovered ${recovered} unread message(s) after Long Poll cursor reset`,
+              `[${opts.accountId}] VK recovered ${recovered} unread message(s) after Long Poll cursor reset`,
             );
           }
         },
