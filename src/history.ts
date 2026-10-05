@@ -331,7 +331,7 @@ export async function recoverVkUnreadHistory(params: {
     return recovered;
   } catch (error) {
     params.onError?.(error);
-    return 0;
+    throw error;
   }
 }
 
