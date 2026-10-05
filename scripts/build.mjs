@@ -20,6 +20,7 @@ const entryPoints = [
   "src/format.ts",
   "src/group-access.ts",
   "src/inbound.ts",
+  "src/ingress.ts",
   "src/history.ts",
   "src/keyboard.ts",
   "src/media.ts",
