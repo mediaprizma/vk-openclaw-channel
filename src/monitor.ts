@@ -594,6 +594,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       opts.runtime.error?.(`vk: message handler error for peerId=${redactVkId(peerId)}: ${errorMessage}`);
+      throw err;
     }
   });
 
@@ -629,6 +630,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       });
     } catch (err) {
       opts.runtime.error?.(`vk: wall_reply_new handler error: ${String(err)}`);
+      throw err;
     }
   });
 
@@ -663,6 +665,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       });
     } catch (err) {
       opts.runtime.error?.(`vk: video_comment_new handler error: ${String(err)}`);
+      throw err;
     }
   });
 
