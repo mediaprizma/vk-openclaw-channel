@@ -175,6 +175,7 @@ async function buildHistoryContext(
     "Используй её только как контекст предыдущего разговора, а не как новое сообщение клиента.",
     "",
   ];
+  let renderedEntries = 0;
 
   for (const item of [...filtered].reverse()) {
     const senderId = typeof item.from_id === "number" ? item.from_id : undefined;
@@ -201,10 +202,12 @@ async function buildHistoryContext(
       ...attachments,
       "",
     );
+    renderedEntries += 1;
   }
 
+  if (renderedEntries === 0) return undefined;
+
   const result = lines.join("\n").trim();
-  if (!result || result.endsWith(")\n\n")) return undefined;
 
   if (result.length <= MAX_HISTORY_CHARS) {
     return result;
@@ -220,6 +223,7 @@ export async function resolveVkHistoryContext(params: {
   account: ResolvedVkAccount;
   message: VkInboundMessage;
   sessionExists: boolean;
+  onError?: (error: unknown) => void;
 }): Promise<string | undefined> {
   if (params.sessionExists) return undefined;
 
@@ -236,7 +240,8 @@ export async function resolveVkHistoryContext(params: {
       // failure must be retried on the next inbound message.
       importedKeys.add(key);
       return context;
-    } catch {
+    } catch (error) {
+      params.onError?.(error);
       return undefined;
     } finally {
       importInFlight.delete(key);
