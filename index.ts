@@ -38,8 +38,9 @@ export default defineChannelPluginEntry({
     api.on("message_received", async (event, ctx) => {
       if (ctx.channelId !== CHANNEL_ID || !ctx.sessionKey || !ctx.accountId) return;
       const masterId = configuredMasterVkId(api.config as CoreConfig, ctx.accountId);
-      if (masterId !== undefined && Number(event.senderId) === masterId) return;
       const peerId = numericVkTarget(event.from);
+      const senderId = Number(event.senderId);
+      if (masterId !== undefined && (senderId === masterId || peerId === masterId)) return;
       if (peerId === undefined || peerId >= 2_000_000_000) return;
 
       await rememberVkClientSession({
