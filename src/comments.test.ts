@@ -54,6 +54,29 @@ describe("VK comments", () => {
     await expect(resolveVkWallComment(mockVk as never, { id: 1 })).resolves.toBeNull();
   });
 
+  it("resolves a wall comment when the VK event is wrapped under object", async () => {
+    const result = await resolveVkWallComment(mockVk as never, {
+      type: "wall_reply_new",
+      object: {
+        id: 43,
+        owner_id: -100,
+        post_id: 778,
+        from_id: 124,
+        text: "Привет",
+        date: 1700000001,
+      },
+      group_id: 100,
+    });
+    expect(result).toMatchObject({
+      eventType: "post_comment",
+      commentId: 43,
+      senderId: 124,
+      ownerId: -100,
+      postId: 778,
+      text: "Привет",
+    });
+  });
+
   it("resolves a wall comment with the source post link only", async () => {
     const result = await resolveVkWallComment(mockVk as never, {
       id: 42,
