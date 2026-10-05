@@ -593,6 +593,9 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
           : undefined,
       peerId,
       senderId,
+      ...(typeof context.adminAuthorId === "number" && Number.isSafeInteger(context.adminAuthorId)
+        ? { adminAuthorId: context.adminAuthorId }
+        : {}),
       text,
       timestamp: createdAtSeconds ? createdAtSeconds * 1000 : Date.now(),
       isGroup,
