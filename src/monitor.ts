@@ -539,11 +539,20 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     },
     resolveWallComment: async (object) => {
       const comment = await resolveVkWallComment(vk, object);
-      return comment ? commentMessageFromContext(comment) : null;
+      if (!comment) return null;
+      if (!isVkCommentEnabled(account.config, "post")) return null;
+      const ownGroup = await resolveVkOwnGroup(opts.token);
+      if (ownGroup && comment.senderId === -ownGroup.id) return null;
+      return commentMessageFromContext(comment);
     },
     resolveVideoComment: async (object) => {
       const comment = await resolveVkVideoComment(vk, object);
-      return comment ? commentMessageFromContext(comment) : null;
+      if (!comment) return null;
+      const kind = comment.eventType === "clip_comment" ? "clip" : "video";
+      if (!isVkCommentEnabled(account.config, kind)) return null;
+      const ownGroup = await resolveVkOwnGroup(opts.token);
+      if (ownGroup && comment.senderId === -ownGroup.id) return null;
+      return commentMessageFromContext(comment);
     },
   });
 
