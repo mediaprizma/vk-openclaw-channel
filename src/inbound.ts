@@ -51,6 +51,7 @@ import { answerVkQuestionByText } from "./question-events.js";
 import { resolveVkGroupAccess, resolveVkGroupSenderAdmission } from "./group-access.js";
 import { normalizeVkAllowlist, resolveVkAllowlistMatch } from "./send-support.js";
 import { getVkRuntime } from "./runtime.js";
+import { resolveVkHistoryContext } from "./history.js";
 import {
   editMessageVk,
   markMessageReadVk,
@@ -298,7 +299,7 @@ export async function handleVkInbound(params: {
         ].join("\n")
       : undefined;
 
-  const agentBody = inboundSurfaceContext
+  let agentBody = inboundSurfaceContext
     ? inboundSurfaceContext + "\n\n" + rawBody
     : rawBody;
   if (!rawBody) {
@@ -476,6 +477,19 @@ export async function handleVkInbound(params: {
     storePath,
     sessionKey: route.sessionKey,
   });
+
+  const importedHistory = await resolveVkHistoryContext({
+    account,
+    message,
+    sessionExists: previousTimestamp !== undefined,
+  });
+  if (importedHistory) {
+    agentBody = importedHistory + "\n\n" + agentBody;
+    runtime.log?.(
+      `VK history imported for sender=${redactVkId(message.senderId)}: one-time context added before current message`,
+    );
+  }
+
   const body = core.channel.reply.formatAgentEnvelope({
     channel: "VK",
     from: fromLabel,
