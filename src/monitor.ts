@@ -492,6 +492,42 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     await stopPromise;
   };
 
+  const cursorStore = core.state.openKeyedStore<VkLongPollCursor>({
+    namespace: "vk.longpoll-cursor",
+    maxEntries: 64,
+    overflowPolicy: "reject-new",
+  });
+  const cursorKey = account.accountId;
+
+  const durableIngress = createVkDurableIngress({
+    account,
+    runtime: opts.runtime,
+    abortSignal: stopSignal,
+    handleMessage: async (message, lifecycle) => {
+      const currentCfg = readVkRuntimeConfig(core);
+      const currentAccount = resolveVkAccount({
+        cfg: currentCfg,
+        accountId: account.accountId,
+      });
+      await handleVkInbound({
+        message,
+        account: currentAccount,
+        config: currentCfg,
+        runtime: opts.runtime,
+        turnAdoptionLifecycle: lifecycle,
+      });
+    },
+    resolveWallComment: async (object) => {
+      const comment = await resolveVkWallComment(vk, object);
+      return comment ? commentMessageFromContext(comment) : null;
+    },
+    resolveVideoComment: async (object) => {
+      const comment = await resolveVkVideoComment(vk, object);
+      return comment ? commentMessageFromContext(comment) : null;
+    },
+  });
+
+
   // Ensure gateway stop triggers VK polling shutdown.
   opts.abortSignal?.addEventListener("abort", () => {
     void stopUpdates();
