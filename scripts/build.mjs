@@ -36,6 +36,7 @@ const entryPoints = [
   "src/secret-contract.ts",
   "src/send-support.ts",
   "src/send.ts",
+  "src/master-routing.ts",
   "src/setup-core.ts",
   "src/setup-surface.ts",
   "src/types.ts",
