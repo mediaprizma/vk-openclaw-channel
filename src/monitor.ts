@@ -7,6 +7,7 @@ import { createStallWatchdog, type StallWatchdog } from "./stall-watchdog.js";
 import { resolveVkAccount } from "./accounts.js";
 import { redactVkId } from "./diagnostics.js";
 import { handleVkInbound } from "./inbound.js";
+import { createVkDurableIngress, type VkIngressEvent } from "./ingress.js";
 import { resolveVkVideoComment, resolveVkWallComment } from "./comments.js";
 import {
   extractVkInboundAttachments,
@@ -53,6 +54,13 @@ function resolveTransportSilenceMs(config: VkAccountConfig): number {
   return parseStrictPositiveInteger(config.transport?.silenceMs) ?? DEFAULT_TRANSPORT_SILENCE_MS;
 }
 
+type VkLongPollCursor = {
+  groupId: number;
+  server: string;
+  key: string;
+  ts: string;
+};
+
 class BotsLongPollTransport {
   private started = false;
   private ts = "";
@@ -67,17 +75,23 @@ class BotsLongPollTransport {
   private readonly groupId: number;
   private readonly onPollCompleted: () => void;
   private readonly onUpdate: (update: Record<string, unknown>) => Promise<unknown> | unknown;
+  private readonly loadCursor: () => Promise<VkLongPollCursor | undefined>;
+  private readonly saveCursor: (cursor: VkLongPollCursor) => Promise<void>;
 
   constructor(params: {
     api: VK["api"];
     groupId: number;
     onPollCompleted: () => void;
     onUpdate: (update: Record<string, unknown>) => Promise<unknown> | unknown;
+    loadCursor: () => Promise<VkLongPollCursor | undefined>;
+    saveCursor: (cursor: VkLongPollCursor) => Promise<void>;
   }) {
     this.api = params.api;
     this.groupId = params.groupId;
     this.onPollCompleted = params.onPollCompleted;
     this.onUpdate = params.onUpdate;
+    this.loadCursor = params.loadCursor;
+    this.saveCursor = params.saveCursor;
     this.firstSuccessfulPoll = new Promise<void>((resolve, reject) => {
       this.resolveFirstSuccessfulPoll = resolve;
       this.rejectFirstSuccessfulPoll = reject;
@@ -102,9 +116,7 @@ class BotsLongPollTransport {
     return this.firstSuccessfulPoll.finally(() => clearTimeout(timeout));
   }
 
-  async start(): Promise<void> {
-    if (this.started) throw new Error("VK Bots Long Poll already started");
-
+  private async refreshServer(keepTs: boolean): Promise<void> {
     const response = await this.api.groups.getLongPollServer({
       group_id: this.groupId,
     });
@@ -115,7 +127,35 @@ class BotsLongPollTransport {
 
     this.serverUrl = new URL(data.server);
     this.key = data.key;
-    this.ts = String(data.ts);
+    if (!keepTs) {
+      this.ts = String(data.ts);
+    }
+    await this.saveCursor({
+      groupId: this.groupId,
+      server: data.server,
+      key: data.key,
+      ts: this.ts,
+    });
+  }
+
+  async start(): Promise<void> {
+    if (this.started) throw new Error("VK Bots Long Poll already started");
+
+    const persisted = await this.loadCursor();
+    if (
+      persisted &&
+      persisted.groupId === this.groupId &&
+      persisted.server &&
+      persisted.key &&
+      persisted.ts
+    ) {
+      this.serverUrl = new URL(persisted.server);
+      this.key = persisted.key;
+      this.ts = persisted.ts;
+    } else {
+      await this.refreshServer(false);
+    }
+
     this.started = true;
     this.loopPromise = this.runLoop();
   }
@@ -133,22 +173,16 @@ class BotsLongPollTransport {
       } catch (error) {
         if (!this.started) break;
         const message = error instanceof Error ? error.message : String(error);
-        // A Long Poll server error requires a fresh server/key/ts.
+        // Network/HTTP failures are retried with the same durable ts. Refreshing
+        // the server is safe only when we explicitly preserve that ts.
         try {
-          const response = await this.api.groups.getLongPollServer({
-            group_id: this.groupId,
-          });
-          const data = response as { server?: string; key?: string; ts?: string | number };
-          if (!data.server || !data.key || data.ts === undefined) {
-            throw new Error("VK groups.getLongPollServer returned an incomplete response");
-          }
-          this.serverUrl = new URL(data.server);
-          this.key = data.key;
-          this.ts = String(data.ts);
+          await this.refreshServer(true);
         } catch (refreshError) {
           const refreshMessage =
             refreshError instanceof Error ? refreshError.message : String(refreshError);
-          throw new Error(`VK Bots Long Poll restart failed: ${refreshMessage}; original: ${message}`);
+          throw new Error(
+            `VK Bots Long Poll restart failed: ${refreshMessage}; original: ${message}`,
+          );
         }
         await new Promise<void>((resolve) => setTimeout(resolve, 1000));
       }
@@ -195,22 +229,54 @@ class BotsLongPollTransport {
     if ("failed" in result) {
       if (result.failed === 1 && "ts" in result) {
         this.ts = String(result.ts);
+        await this.saveCursor({
+          groupId: this.groupId,
+          server: this.serverUrl.toString(),
+          key: this.key,
+          ts: this.ts,
+        });
         this.onPollCompleted();
         return;
       }
-      throw new Error(`VK Long Poll failed=${result.failed}${"error" in result && result.error ? ` ${result.error}` : ""}`);
+      if (result.failed === 2) {
+        await this.refreshServer(true);
+        return;
+      }
+      if (result.failed === 3) {
+        // VK explicitly tells us the cursor is too old. A fresh ts is required;
+        // the history reconciliation layer is the fallback for messages missed
+        // across this transport-level reset.
+        await this.refreshServer(false);
+        return;
+      }
+      throw new Error(
+        `VK Long Poll failed=${result.failed}${"error" in result && result.error ? ` ${result.error}` : ""}`,
+      );
     }
 
-    this.ts = String(result.ts);
+    const nextTs = String(result.ts);
     this.settleReadinessSuccess();
     this.onPollCompleted();
 
+    // IMPORTANT: do not advance the durable transport cursor until every update
+    // has been durably admitted. If the process dies after this point, the saved
+    // ts still points before the batch and VK will replay it on restart. The
+    // ingress queue's event ids make that replay idempotent.
     for (const update of result.updates ?? []) {
       if (!update || typeof update !== "object" || Array.isArray(update)) continue;
       await this.onUpdate(update as Record<string, unknown>);
     }
+
+    this.ts = nextTs;
+    await this.saveCursor({
+      groupId: this.groupId,
+      server: this.serverUrl.toString(),
+      key: this.key,
+      ts: this.ts,
+    });
   }
 }
+
 
 
 /**
