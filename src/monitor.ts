@@ -624,8 +624,8 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       );
       await durableIngress.enqueue({
         version: 1,
-        kind: "wall_reply_new",
-        object: context as unknown as Record<string, unknown>,
+        kind: "message",
+        message,
       });
     } catch (err) {
       opts.runtime.error?.(`vk: wall_reply_new handler error: ${String(err)}`);
@@ -658,8 +658,8 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       );
       await durableIngress.enqueue({
         version: 1,
-        kind: "video_comment_new",
-        object: context as unknown as Record<string, unknown>,
+        kind: "message",
+        message,
       });
     } catch (err) {
       opts.runtime.error?.(`vk: video_comment_new handler error: ${String(err)}`);
@@ -687,6 +687,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
   });
 
   try {
+    durableIngress.start();
     // Detect whether Bots LP is available; fall back to User LP otherwise
     const botsLp = await canUseBotsLongPoll(vk);
     if (stopRequested || opts.abortSignal?.aborted) {
@@ -735,6 +736,12 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
           if (publishPollActivity) {
             opts.setStatus?.({ lastTransportActivityAt: Date.now() });
           }
+        },
+        loadCursor: async () => {
+          return await cursorStore.lookup(cursorKey);
+        },
+        saveCursor: async (cursor) => {
+          await cursorStore.register(cursorKey, cursor);
         },
         onUpdate: async (update) => {
           const eventType = typeof update.type === "string" ? update.type : "unknown";
@@ -882,6 +889,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
   } finally {
     try {
       await stopUpdates();
+      await durableIngress.stop();
     } finally {
       // Unconditional: a failed start never armed the watchdog, so nothing else
       // would ever stop it, and each retry would leave another interval behind.
