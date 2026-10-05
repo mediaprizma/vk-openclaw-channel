@@ -605,7 +605,10 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     if (stopRequested) return;
     try {
       const comment = await resolveVkWallComment(vk, context);
-      if (!comment) return;
+      if (!comment) {
+        opts.runtime.warn?.("vk: ignored malformed wall_reply_new event (missing comment fields)");
+        return;
+      }
       const kind = comment.eventType === "clip_comment" ? "clip" : "post";
       if (!isVkCommentEnabled(account.config, kind)) return;
       const ownGroup = await resolveVkOwnGroup(opts.token);
@@ -641,7 +644,10 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     if (stopRequested) return;
     try {
       const comment = await resolveVkVideoComment(vk, context);
-      if (!comment) return;
+      if (!comment) {
+        opts.runtime.warn?.("vk: ignored malformed video_comment_new event (missing comment fields)");
+        return;
+      }
       const kind = comment.eventType === "clip_comment" ? "clip" : "video";
       if (!isVkCommentEnabled(account.config, kind)) return;
       const ownGroup = await resolveVkOwnGroup(opts.token);
@@ -704,8 +710,15 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
 
     if (useBotsLongPoll) {
       await ensureVkCommentLongPollEvents(vk, botsLp.groupId, account);
+      const comments = account.config.comments;
+      const enabledEvents = [
+        comments?.enabled !== false && comments?.postComments !== false ? "wall_reply_new" : null,
+        comments?.enabled !== false && (comments?.clipComments !== false || comments?.videoComments === true)
+          ? "video_comment_new"
+          : null,
+      ].filter((value): value is string => value !== null);
       opts.runtime.log?.(
-        `[${opts.accountId}] VK Long Poll comment events enabled: wall_reply_new, video_comment_new`,
+        `[${opts.accountId}] VK Long Poll comment events enabled: ${enabledEvents.join(", ") || "none"}`,
       );
     }
     // The only honest liveness signal is "a poll request came back". The cursor
