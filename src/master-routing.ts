@@ -49,6 +49,7 @@ function prune(now = Date.now()): void {
 }
 
 async function persist(): Promise<void> {
+  if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") return;
   prune();
   const snapshot: PersistedState = {
     version: 1,
