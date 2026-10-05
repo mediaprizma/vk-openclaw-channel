@@ -112,7 +112,7 @@ function resolveVkOutboundSessionRoute(params: {
         target: normalizedTarget,
         agentId: params.agentId,
         sessionKey: params.currentSessionKey,
-        clientPeerId: Number((params.currentSessionKey.match(/(\\d+)$/)?.[1]) ?? 0),
+        clientPeerId: Number((params.currentSessionKey.match(/(\d+)$/)?.[1]) ?? 0),
         clientTarget: params.currentSessionKey,
         queuedAt: Date.now(),
       });
