@@ -186,6 +186,8 @@ export type VkInboundMessage = {
   conversationMessageId?: number;
   peerId: number;
   senderId: number;
+  /** VK admin id when a community admin sent a message on behalf of the community. */
+  adminAuthorId?: number;
   text: string;
   timestamp: number;
   isGroup: boolean;

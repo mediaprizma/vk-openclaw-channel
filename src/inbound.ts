@@ -194,6 +194,27 @@ export async function handleVkInbound(params: {
   const { message, account, config, runtime, statusSink, turnAdoptionLifecycle } = params;
   const core = getVkRuntime();
   const isComment = Boolean(message.comment);
+  const configuredMasterVkId =
+    account.config.masterVkId === undefined
+      ? undefined
+      : Number(String(account.config.masterVkId).trim());
+  const isConfiguredMaster =
+    configuredMasterVkId !== undefined &&
+    Number.isSafeInteger(configuredMasterVkId) &&
+    configuredMasterVkId > 0;
+  const isOperatorMessage =
+    !isComment &&
+    isConfiguredMaster &&
+    message.adminAuthorId === configuredMasterVkId;
+
+  if (isOperatorMessage && message.peerId === configuredMasterVkId) {
+    runtime.log?.(
+      "vk: drop operator DM from " +
+        redactVkId(configuredMasterVkId) +
+        ": no client peer can be inferred; master must answer inside the client dialog",
+    );
+    return;
+  }
   if (isComment && account.config.comments?.enabled === false) {
     runtime.log?.(`vk: drop comment ${redactVkId(message.messageId)} (comments disabled)`);
     return;
@@ -304,6 +325,20 @@ export async function handleVkInbound(params: {
   let agentBody = inboundSurfaceContext
     ? inboundSurfaceContext + "\n\n" + rawBody
     : rawBody;
+
+  if (isOperatorMessage) {
+    agentBody = [
+      "Источник сообщения:",
+      "ВКонтакте → мастер/оператор сообщества",
+      "VK ID мастера: " + message.adminAuthorId,
+      "Диалог клиента VK ID: " + message.peerId,
+      "",
+      "Сообщение мастера:",
+      agentBody,
+      "",
+      "Это инструкция мастера. Не создавай отдельную сессию мастера и не отвечай мастеру вместо клиента. Выполни инструкцию в сессии этого клиента.",
+    ].join("\n");
+  }
   if (!rawBody) {
     // Only reachable when every forward was hidden: the empty-message check above
     // already let this one through. Say so, without naming the hidden authors.
@@ -317,7 +352,7 @@ export async function handleVkInbound(params: {
   // authenticated by VK as events on this community wall/video, so they do not
   // inherit the private-DM pairing gate. Their agent session is still keyed to
   // the same canonical VK sender id as a DM.
-  if (!isComment && isGroup) {
+  if (!isOperatorMessage && !isComment && isGroup) {
     const admission = resolveVkGroupSenderAdmission(groupAccess, message.senderId);
     if ("reason" in admission) {
       runtime.log?.(
@@ -329,7 +364,7 @@ export async function handleVkInbound(params: {
       );
       return;
     }
-  } else if (!isComment) {
+  } else if (!isOperatorMessage && !isComment) {
     if (dmPolicy === "disabled") {
       runtime.log?.(`vk: drop DM sender=${redactVkId(message.senderId)} (dmPolicy=disabled)`);
       return;
@@ -374,10 +409,12 @@ export async function handleVkInbound(params: {
         | boolean
         | undefined) !== false
     : true;
-  const senderAllowedForCommands = resolveVkAllowlistMatch({
-    allowFrom: isGroup ? effectiveGroupSenderAllowFrom : effectiveAllowFrom,
-    senderId: message.senderId,
-  }).allowed;
+  const senderAllowedForCommands =
+    isOperatorMessage ||
+    resolveVkAllowlistMatch({
+      allowFrom: isGroup ? effectiveGroupSenderAllowFrom : effectiveAllowFrom,
+      senderId: message.senderId,
+    }).allowed;
   const hasControlCommand = core.channel.text.hasControlCommand(
     commandInput,
     config as OpenClawConfig,
@@ -412,7 +449,7 @@ export async function handleVkInbound(params: {
   );
   const requireMention = isGroup ? (groupConfig?.requireMention ?? false) : false;
 
-  if (isGroup && requireMention && !wasMentioned && !hasControlCommand) {
+  if (!isOperatorMessage && isGroup && requireMention && !wasMentioned && !hasControlCommand) {
     runtime.log?.(`vk: drop group peerId=${redactVkId(message.peerId)} (mention required)`);
     return;
   }
@@ -464,11 +501,13 @@ export async function handleVkInbound(params: {
     },
   });
 
-  const fromLabel = message.comment
-    ? `vk:comment:${message.comment.eventType}:${message.senderId}`
-    : isGroup
-      ? `vk:chat:${message.peerId}`
-      : `vk:${message.senderId}`;
+  const fromLabel = isOperatorMessage
+    ? "vk:master:" + message.adminAuthorId
+    : message.comment
+      ? `vk:comment:${message.comment.eventType}:${message.senderId}`
+      : isGroup
+        ? `vk:chat:${message.peerId}`
+        : `vk:${message.senderId}`;
   const storePath = core.channel.session.resolveStorePath(
     (config as Record<string, Record<string, unknown>>).session?.store as string | undefined,
     {

@@ -332,6 +332,9 @@ export async function recoverVkUnreadHistory(params: {
             conversationMessageId: item.conversation_message_id,
             peerId,
             senderId: item.from_id,
+            ...(typeof item.admin_author_id === "number" && Number.isSafeInteger(item.admin_author_id)
+              ? { adminAuthorId: item.admin_author_id }
+              : {}),
             text: item.text ?? "",
             timestamp:
               typeof item.date === "number" && Number.isFinite(item.date)
