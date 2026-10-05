@@ -71,12 +71,12 @@ describe.skipIf(!Ajv)("openclaw.plugin.json channel config schema", () => {
     ).toBe(true);
   });
 
-  it("accepts commentPromptTemplate at channel and account levels", () => {
-    expect(validate({ token: "tok", commentPromptTemplate: "{{comment_text}}" })).toBe(true);
+  it("accepts commentResponseInstructions at channel and account levels", () => {
+    expect(validate({ token: "tok", commentResponseInstructions: "Изучи исходный пост перед ответом." })).toBe(true);
     expect(
       validate({
         token: "tok",
-        accounts: { work: { token: "tok", commentPromptTemplate: "{{origin_url}}" } },
+        accounts: { work: { token: "tok", commentResponseInstructions: "Ответь кратко." } },
       }),
     ).toBe(true);
   });
