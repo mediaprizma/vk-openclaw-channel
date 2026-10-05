@@ -116,6 +116,18 @@
           "help": "Дополнительная инструкция для этой группы VK.",
           "placeholder": "Например: учитывай особенности этой группы при ответах…",
           "advanced": true
+        },
+        "masterVkId": {
+          "label": "VK ID мастера",
+          "help": "VK ID мастера/оператора. Сообщения мастера в диалогах клиентов обрабатываются как сообщения оператора и не создают отдельную сессию мастера.",
+          "placeholder": "Например: 184132961",
+          "advanced": false
+        },
+        "accounts.*.masterVkId": {
+          "label": "VK ID мастера",
+          "help": "VK ID мастера для этого аккаунта сообщества. Если задан, сообщения этого пользователя не создают отдельную клиентскую сессию.",
+          "placeholder": "Например: 184132961",
+          "advanced": false
         }
       },
       "schema": {
@@ -465,18 +477,26 @@
                     }
                   ]
                 },
-                          "comments": {
-            "type": "object",
-            "description": "Per-account VK wall/video comment handling.",
-            "additionalProperties": false,
-            "properties": {
-              "enabled": { "type": "boolean" },
-              "postComments": { "type": "boolean" },
-              "clipComments": { "type": "boolean" },
-              "videoComments": { "type": "boolean" }
-            }
-          },
-"systemPrompt": {
+                "comments": {
+                  "type": "object",
+                  "description": "Per-account VK wall/video comment handling.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "postComments": {
+                      "type": "boolean"
+                    },
+                    "clipComments": {
+                      "type": "boolean"
+                    },
+                    "videoComments": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "systemPrompt": {
                   "type": "string",
                   "description": "System prompt for this VK account. When set, it overrides the channel-wide system prompt."
                 },
@@ -492,9 +512,19 @@
                     "allowlist",
                     "allowlist_quote"
                   ]
+                },
+                "masterVkId": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*$",
+                  "description": "VK ID мастера/оператора. Сообщения этого пользователя не создают отдельную клиентскую сессию."
                 }
               }
             }
+          },
+          "masterVkId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "VK ID мастера/оператора. Сообщения этого пользователя не создают отдельную клиентскую сессию."
           }
         }
       }
