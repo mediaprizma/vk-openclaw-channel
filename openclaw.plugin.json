@@ -186,7 +186,7 @@
         "additionalProperties": true,
         "properties": {
           "token": {
-            "description": "Community access token, or a SecretRef { source, provider, id } the gateway resolves at startup.",
+            "description": "Ключ доступа сообщества ВКонтакте. Рекомендуется хранить его через SecretRef или защищённый источник секретов.",
             "anyOf": [
               {
                 "type": "string"
@@ -287,7 +287,8 @@
                   }
                 ]
               }
-            ]
+            ],
+            "title": "Токен сообщества VK"
           },
           "diagnostics": {
             "type": "object",
@@ -306,26 +307,31 @@
           },
           "comments": {
             "type": "object",
-            "description": "VK wall/video comment handling. Comment events reuse the customer's direct session while keeping a separate reply route to the public thread.",
+            "description": "Управление обработкой комментариев к записям, Кли́пам и видео. По умолчанию комментарии к записям и Кли́пам обрабатываются.",
             "additionalProperties": false,
             "properties": {
               "enabled": {
                 "type": "boolean",
-                "description": "Enable comment events."
+                "description": "Enable comment events.",
+                "title": "Обрабатывать комментарии"
               },
               "postComments": {
                 "type": "boolean",
-                "description": "Handle comments on wall posts."
+                "description": "Handle comments on wall posts.",
+                "title": "Комментарии к записям"
               },
               "clipComments": {
                 "type": "boolean",
-                "description": "Handle comments on VK Clips (short videos)."
+                "description": "Handle comments on VK Clips (short videos).",
+                "title": "Комментарии к Кли́пам"
               },
               "videoComments": {
                 "type": "boolean",
-                "description": "Handle comments on regular VK videos."
+                "description": "Handle comments on regular VK videos.",
+                "title": "Комментарии к видео"
               }
-            }
+            },
+            "title": "Комментарии VK"
           },
           "contextVisibility": {
             "type": "string",
@@ -334,19 +340,22 @@
               "all",
               "allowlist",
               "allowlist_quote"
-            ]
+            ],
+            "title": "Видимость общего контекста"
           },
           "systemPrompt": {
             "type": "string",
-            "description": "Trusted system prompt injected into every VK turn. This is available channel-wide and can be overridden per account."
+            "description": "Общая инструкция, которую агент получает при обработке сообщений из VK.",
+            "title": "Инструкция для агента"
           },
           "commentResponseInstructions": {
             "type": "string",
-            "description": "Инструкция агенту при ответе на комментарии VK. Структура входящего контекста комментария фиксирована плагином и не настраивается через это поле."
+            "description": "Дополнительная инструкция агенту перед ответом на публичный комментарий VK.",
+            "title": "Инструкция для комментариев"
           },
           "audio": {
             "type": "object",
-            "description": "Channel-wide voice limits; `settings.ts` reads `channels.vk-openclaw-channel.audio` for every account, so they are not accepted per account. `openclaw config validate` reads this schema, so the limits are typed here as well as in the zod schema.",
+            "description": "Дополнительные лимиты обработки голосовых сообщений. Обычно менять не требуется.",
             "additionalProperties": false,
             "properties": {
               "maxVoiceMs": {
@@ -379,11 +388,12 @@
                 "exclusiveMinimum": 0,
                 "description": "Download ceiling for remote media; the URL comes from a model reply."
               }
-            }
+            },
+            "title": "Голосовые сообщения"
           },
           "streaming": {
             "type": "object",
-            "description": "Channel-wide step-progress draft: with `mode: \"progress\"` the agent's execution steps are shown in one message edited in place, which then becomes the answer. Only the mode is typed here; the keys below it (`progress.label`, `progress.maxLines`, …) belong to the core draft renderer. Not accepted per account.",
+            "description": "Показывать промежуточные шаги обработки в одном редактируемом сообщении.",
             "additionalProperties": true,
             "properties": {
               "mode": {
@@ -393,11 +403,12 @@
                   "progress"
                 ]
               }
-            }
+            },
+            "title": "Отображение выполнения"
           },
           "accounts": {
             "type": "object",
-            "description": "Per-account overrides. Diagnostics, voice limits and the step-progress draft are channel-wide; contextVisibility can be overridden here.",
+            "description": "Настройки отдельных сообществ VK. Используйте этот раздел, если подключаете несколько сообществ.",
             "additionalProperties": {
               "type": "object",
               "allOf": [
@@ -425,7 +436,7 @@
               ],
               "properties": {
                 "token": {
-                  "description": "Community access token, or a SecretRef { source, provider, id } the gateway resolves at startup.",
+                  "description": "Токен этого сообщества. Для каждого сообщества используется свой токен.",
                   "anyOf": [
                     {
                       "type": "string"
@@ -526,11 +537,12 @@
                         }
                       ]
                     }
-                  ]
+                  ],
+                  "title": "Токен сообщества VK"
                 },
                 "comments": {
                   "type": "object",
-                  "description": "Per-account VK wall/video comment handling.",
+                  "description": "Настройки обработки комментариев этого сообщества.",
                   "additionalProperties": false,
                   "properties": {
                     "enabled": {
@@ -545,15 +557,18 @@
                     "videoComments": {
                       "type": "boolean"
                     }
-                  }
+                  },
+                  "title": "Комментарии VK"
                 },
                 "systemPrompt": {
                   "type": "string",
-                  "description": "System prompt for this VK account. When set, it overrides the channel-wide system prompt."
+                  "description": "System prompt for this VK account. When set, it overrides the channel-wide system prompt.",
+                  "title": "Инструкция для агента"
                 },
                 "commentResponseInstructions": {
                   "type": "string",
-                  "description": "Инструкция агенту при ответе на комментарии VK. Структура входящего контекста комментария фиксирована плагином."
+                  "description": "Инструкция агенту при ответе на комментарии VK. Структура входящего контекста комментария фиксирована плагином.",
+                  "title": "Инструкция для комментариев"
                 },
                 "contextVisibility": {
                   "type": "string",
@@ -567,15 +582,18 @@
                 "masterVkId": {
                   "type": "string",
                   "pattern": "^[1-9][0-9]*$",
-                  "description": "VK ID мастера/оператора. Сообщения этого пользователя не создают отдельную клиентскую сессию."
+                  "description": "VK ID мастера для этого сообщества.",
+                  "title": "VK ID мастера"
                 }
               }
-            }
+            },
+            "title": "Сообщества VK"
           },
           "masterVkId": {
             "type": "string",
             "pattern": "^[1-9][0-9]*$",
-            "description": "VK ID мастера/оператора. Сообщения этого пользователя не создают отдельную клиентскую сессию."
+            "description": "VK ID мастера. Агентские вопросы из разных клиентских сессий приходят в один чат мастера. Ответ мастера через «Ответить» возвращается в исходную сессию клиента.",
+            "title": "VK ID мастера"
           }
         }
       }
