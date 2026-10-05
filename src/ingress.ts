@@ -5,6 +5,7 @@ import {
 } from "openclaw/plugin-sdk/channel-outbound";
 import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
 import { handleVkInbound } from "./inbound.js";
+import { getVkRuntime, readVkRuntimeConfig } from "./runtime.js";
 import type { ResolvedVkAccount, VkInboundMessage } from "./types.js";
 
 const VK_INGRESS_VERSION = 1;
