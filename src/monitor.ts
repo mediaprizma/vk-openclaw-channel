@@ -606,7 +606,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     try {
       const comment = await resolveVkWallComment(vk, context);
       if (!comment) {
-        opts.runtime.warn?.("vk: ignored malformed wall_reply_new event (missing comment fields)");
+        opts.runtime.log?.("vk: ignored malformed wall_reply_new event (missing comment fields)");
         return;
       }
       const kind = comment.eventType === "clip_comment" ? "clip" : "post";
@@ -645,7 +645,7 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     try {
       const comment = await resolveVkVideoComment(vk, context);
       if (!comment) {
-        opts.runtime.warn?.("vk: ignored malformed video_comment_new event (missing comment fields)");
+        opts.runtime.log?.("vk: ignored malformed video_comment_new event (missing comment fields)");
         return;
       }
       const kind = comment.eventType === "clip_comment" ? "clip" : "video";
