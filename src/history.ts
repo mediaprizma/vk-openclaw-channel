@@ -225,7 +225,7 @@ export async function resolveVkHistoryContext(params: {
   sessionExists: boolean;
   onError?: (error: unknown) => void;
 }): Promise<string | undefined> {
-  if (params.sessionExists) return undefined;
+  if (params.sessionExists || params.message.isGroup) return undefined;
 
   const key = historyKey(params.account, params.message.senderId);
   if (importedKeys.has(key)) return undefined;
