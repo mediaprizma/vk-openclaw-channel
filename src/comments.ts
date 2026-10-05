@@ -61,7 +61,14 @@ export async function resolveVkWallComment(
   _vk: VK,
   rawComment: unknown,
 ): Promise<VkInboundComment | null> {
-  const comment = asRecord(rawComment);
+  // vk-io normally passes the comment object directly for wall_reply_new.
+  // Some transport/update adapters preserve the VK event envelope and put the
+  // actual comment under "object". Accept both forms so the comment route is
+  // independent of the transport wrapper.
+  const envelope = asRecord(rawComment);
+  const comment =
+    asRecord(envelope?.object) ??
+    envelope;
   if (!comment) return null;
 
   const id = readInt(comment.id);
