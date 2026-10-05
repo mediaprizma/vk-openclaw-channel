@@ -42,6 +42,7 @@ import {
 import { parseVkCommentTarget } from "./types.js";
 import type { CoreConfig, VkConfig, VkProbe } from "./types.js";
 
+import { queueVkMasterQuestion, takeVkPendingMasterQuestion, rememberVkMasterQuestion } from "./master-routing.js";
 /**
  * Stop signals of running accounts, keyed by account id. Outbound sends read
  * theirs from here: the core's outbound context carries no cancellation, and
@@ -99,10 +100,39 @@ function resolveVkOutboundSessionRoute(params: {
   threadId?: string | number | null;
   currentSessionKey?: string | null;
 }) {
+  const accountId = params.accountId ?? DEFAULT_ACCOUNT_ID;
+  const normalizedTarget = params.target.trim().replace(/^vk:(?:user:)?/i, "");
+  const account = resolveVkAccount({ cfg: params.cfg, accountId });
+  const masterVkId = Number(String(account.config.masterVkId ?? "").trim());
+
+  if (Number.isSafeInteger(masterVkId) && masterVkId > 0 && normalizedTarget === String(masterVkId)) {
+    if (params.currentSessionKey) {
+      queueVkMasterQuestion({
+        accountId,
+        target: normalizedTarget,
+        agentId: params.agentId,
+        sessionKey: params.currentSessionKey,
+        clientPeerId: Number((params.currentSessionKey.match(/peer[^:]*:?(\\d+)$/)?.[1]) ?? 0),
+        clientTarget: params.currentSessionKey,
+        queuedAt: Date.now(),
+      });
+    }
+    return buildChannelOutboundSessionRoute({
+      cfg: params.cfg,
+      agentId: params.agentId,
+      channel: VK_CHANNEL_KEY,
+      accountId,
+      recipientSessionExact: true,
+      peer: { kind: "direct", id: normalizedTarget },
+      chatType: "direct",
+      from: params.target,
+      to: params.target,
+    });
+  }
+
   const commentTarget = parseVkCommentTarget(params.target);
   if (!commentTarget) return null;
 
-  const accountId = params.accountId ?? DEFAULT_ACCOUNT_ID;
   return buildChannelOutboundSessionRoute({
     cfg: params.cfg,
     agentId: params.agentId,
@@ -426,6 +456,22 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         replyTo: replyToId ?? undefined,
         forceDocument: forceDocument ?? undefined,
       });
+      const resolvedAccount = resolveVkAccount({ cfg: cfg as CoreConfig, accountId: accountId ?? undefined });
+      const masterVkId = Number(String(resolvedAccount.config.masterVkId ?? "").trim());
+      if (result && Number.isSafeInteger(masterVkId) && masterVkId > 0 && String(to).replace(/^vk:/i, "") === String(masterVkId)) {
+        const pending = takeVkPendingMasterQuestion({ accountId: accountId ?? DEFAULT_ACCOUNT_ID, target: String(masterVkId) });
+        if (pending) {
+          await rememberVkMasterQuestion({
+            messageId: result.messageId,
+            accountId: pending.accountId,
+            sessionKey: pending.sessionKey,
+            agentId: pending.agentId,
+            clientPeerId: pending.clientPeerId,
+            clientTarget: pending.clientTarget,
+            createdAt: Date.now(),
+          });
+        }
+      }
       logVkOutbound("sendPayload", to, {
         textLen: payload.text?.length ?? 0,
         media: Boolean(payload.mediaUrl || payload.mediaUrls?.length),
