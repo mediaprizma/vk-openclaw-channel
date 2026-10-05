@@ -120,7 +120,7 @@ class BotsLongPollTransport {
     return this.firstSuccessfulPoll.finally(() => clearTimeout(timeout));
   }
 
-  private async refreshServer(keepTs: boolean): Promise<void> {
+  private async refreshServer(keepTs: boolean, persist = true): Promise<void> {
     const response = await this.api.groups.getLongPollServer({
       group_id: this.groupId,
     });
@@ -134,12 +134,14 @@ class BotsLongPollTransport {
     if (!keepTs) {
       this.ts = String(data.ts);
     }
-    await this.saveCursor({
-      groupId: this.groupId,
-      server: data.server,
-      key: data.key,
-      ts: this.ts,
-    });
+    if (persist) {
+      await this.saveCursor({
+        groupId: this.groupId,
+        server: data.server,
+        key: data.key,
+        ts: this.ts,
+      });
+    }
   }
 
   async start(): Promise<void> {
@@ -247,10 +249,24 @@ class BotsLongPollTransport {
         return;
       }
       if (result.failed === 3) {
-        // VK explicitly tells us the cursor is too old. A fresh ts is required;
-        // reconcile unread message history before accepting the new cursor.
-        await this.refreshServer(false);
-        await this.onCursorReset();
+        // VK explicitly tells us the cursor is too old. A fresh ts is required,
+        // but the new cursor is NOT durable until history reconciliation succeeds.
+        const previousTs = this.ts;
+        await this.refreshServer(false, false);
+        try {
+          await this.onCursorReset();
+        } catch (error) {
+          // Keep the last durable cursor. The next loop will retry with the new
+          // server/key but the old ts, rather than acknowledging the gap.
+          this.ts = previousTs;
+          throw error;
+        }
+        await this.saveCursor({
+          groupId: this.groupId,
+          server: this.serverUrl.toString(),
+          key: this.key,
+          ts: this.ts,
+        });
         return;
       }
       throw new Error(
