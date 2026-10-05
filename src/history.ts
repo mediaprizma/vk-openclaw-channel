@@ -1,4 +1,5 @@
 import { getOrCreateVk, resolveVkOwnGroup } from "./send.js";
+import { extractVkInboundAttachments } from "./media.js";
 import type { ResolvedVkAccount, VkInboundMessage } from "./types.js";
 
 const DEFAULT_HISTORY_COUNT = 30;
@@ -250,6 +251,88 @@ export async function resolveVkHistoryContext(params: {
 
   importInFlight.set(key, task);
   return await task;
+}
+
+export async function recoverVkUnreadHistory(params: {
+  account: ResolvedVkAccount;
+  enqueue: (message: VkInboundMessage) => Promise<void>;
+  onError?: (error: unknown) => void;
+}): Promise<number> {
+  const vk = getOrCreateVk(params.account.token);
+  const ownGroup = await resolveVkOwnGroup(params.account.token);
+  if (!ownGroup) {
+    return 0;
+  }
+
+  try {
+    const response = (await vk.api.messages.getConversations({
+      filter: "unread",
+      count: 100,
+      extended: 0,
+      group_id: ownGroup.id,
+    } as never)) as { items?: unknown[] };
+
+    const peers = new Set<number>();
+    for (const raw of response.items ?? []) {
+      if (!raw || typeof raw !== "object") continue;
+      const item = raw as Record<string, unknown>;
+      const conversation =
+        item.conversation && typeof item.conversation === "object"
+          ? (item.conversation as Record<string, unknown>)
+          : undefined;
+      const peer =
+        conversation?.peer && typeof conversation.peer === "object"
+          ? (conversation.peer as Record<string, unknown>)
+          : undefined;
+      const peerId =
+        typeof peer?.id === "number"
+          ? peer.id
+          : typeof (item.last_message as Record<string, unknown> | undefined)?.peer_id === "number"
+            ? ((item.last_message as Record<string, unknown>).peer_id as number)
+            : undefined;
+      if (peerId !== undefined && peerId > 0) {
+        peers.add(peerId);
+      }
+    }
+
+    let recovered = 0;
+    for (const peerId of peers) {
+      const history = (await vk.api.messages.getHistory({
+        peer_id: peerId,
+        count: DEFAULT_HISTORY_COUNT,
+        rev: 1,
+        group_id: ownGroup.id,
+      } as never)) as VkHistoryResponse;
+
+      const items = Array.isArray(history.items) ? history.items : [];
+      for (const item of items) {
+        if (item.out === 1 || item.id === undefined || item.from_id === undefined) {
+          continue;
+        }
+        const message: VkInboundMessage = {
+          eventType: "message",
+          messageId: String(item.id),
+          conversationMessageId: item.conversation_message_id,
+          peerId,
+          senderId: item.from_id,
+          text: item.text ?? "",
+          timestamp:
+            typeof item.date === "number" && Number.isFinite(item.date)
+              ? item.date * 1000
+              : Date.now(),
+          isGroup: peerId >= 2_000_000_000,
+          attachments: extractVkInboundAttachments(item.attachments),
+        };
+        await params.enqueue(message);
+        recovered += 1;
+      }
+    }
+
+    return recovered;
+  } catch (error) {
+    params.onError?.(error);
+    return 0;
+  }
 }
 
 export function resetVkHistoryImportStateForTests(): void {
