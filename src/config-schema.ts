@@ -139,6 +139,7 @@ const VkAccountSchemaBase = z
   .object({
     name: z.string().optional(),
     enabled: z.boolean().optional(),
+    masterVkId: z.union([z.string(), z.number().int().positive()]).optional(),
     token: VkSecretInputSchema.optional(),
     tokenFile: z.string().optional(),
     dmPolicy: DmPolicySchema.optional(),
