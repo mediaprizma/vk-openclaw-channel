@@ -34,6 +34,17 @@ const secretInput = await (async () => {
 
 const manifest = JSON.parse(readFileSync(new URL("../openclaw.plugin.json", import.meta.url), "utf8"));
 
+describe("VK Control UI metadata", () => {
+  const uiHints = manifest.channelConfigs["vk-openclaw-channel"].uiHints;
+
+  it("provides Russian labels for the main settings", () => {
+    expect(uiHints.token.label).toBe("Токен сообщества VK");
+    expect(uiHints.masterVkId.label).toBe("VK ID мастера");
+    expect(uiHints["comments.postComments"].label).toBe("Комментарии к записям");
+    expect(uiHints.accounts.label).toBe("Сообщества VK");
+  });
+});
+
 describe.skipIf(!Ajv)("openclaw.plugin.json channel config schema", () => {
   const validate = Ajv ? new Ajv({ strict: false }).compile(manifest.channelConfigs["vk-openclaw-channel"].schema) : () => false;
 
