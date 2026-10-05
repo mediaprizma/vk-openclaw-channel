@@ -1,5 +1,4 @@
 import { getOrCreateVk, resolveVkOwnGroup } from "./send.js";
-import { extractVkInboundAttachments } from "./media.js";
 import type { ResolvedVkAccount, VkInboundMessage } from "./types.js";
 
 const DEFAULT_HISTORY_COUNT = 30;
@@ -258,6 +257,7 @@ export async function recoverVkUnreadHistory(params: {
   enqueue: (message: VkInboundMessage) => Promise<void>;
   onError?: (error: unknown) => void;
 }): Promise<number> {
+  const { extractVkInboundAttachments } = await import("./media.js");
   const vk = getOrCreateVk(params.account.token);
   const ownGroup = await resolveVkOwnGroup(params.account.token);
   if (!ownGroup) {
