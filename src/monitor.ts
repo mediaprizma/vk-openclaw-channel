@@ -7,7 +7,6 @@ import { createStallWatchdog, type StallWatchdog } from "./stall-watchdog.js";
 import { resolveVkAccount } from "./accounts.js";
 import { redactVkId } from "./diagnostics.js";
 import { handleVkInbound } from "./inbound.js";
-import { createVkDurableIngress } from "./ingress.js";
 import { recoverVkUnreadHistory } from "./history.js";
 import { resolveVkVideoComment, resolveVkWallComment } from "./comments.js";
 import {
@@ -512,49 +511,17 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     await stopPromise;
   };
 
-  const cursorStore = core.state.openKeyedStore<VkLongPollCursor>({
-    namespace: "vk.longpoll-cursor",
-    maxEntries: 64,
-    overflowPolicy: "reject-new",
-  });
-  const cursorKey = account.accountId;
-
-  const durableIngress = createVkDurableIngress({
-    account,
-    runtime: opts.runtime,
-    abortSignal: stopSignal,
-    handleMessage: async (message, lifecycle) => {
-      const currentCfg = readVkRuntimeConfig(core);
-      const currentAccount = resolveVkAccount({
-        cfg: currentCfg,
-        accountId: account.accountId,
-      });
-      await handleVkInbound({
-        message,
-        account: currentAccount,
-        config: currentCfg,
-        runtime: opts.runtime,
-        turnAdoptionLifecycle: lifecycle,
-      });
-    },
-    resolveWallComment: async (object) => {
-      const comment = await resolveVkWallComment(vk, object);
-      if (!comment) return null;
-      if (!isVkCommentEnabled(account.config, "post")) return null;
-      const ownGroup = await resolveVkOwnGroup(opts.token);
-      if (ownGroup && comment.senderId === -ownGroup.id) return null;
-      return commentMessageFromContext(comment);
-    },
-    resolveVideoComment: async (object) => {
-      const comment = await resolveVkVideoComment(vk, object);
-      if (!comment) return null;
-      const kind = comment.eventType === "clip_comment" ? "clip" : "video";
-      if (!isVkCommentEnabled(account.config, kind)) return null;
-      const ownGroup = await resolveVkOwnGroup(opts.token);
-      if (ownGroup && comment.senderId === -ownGroup.id) return null;
-      return commentMessageFromContext(comment);
-    },
-  });
+  // Local cursor only: local/config plugins are intentionally not trusted for
+  // OpenClaw persistent keyed state. The cursor is tracked for the lifetime of
+  // this VK monitor; a gateway restart starts from a fresh VK Long Poll cursor.
+  let longPollCursor: VkLongPollCursor | undefined;
+  const loadCursor = async (): Promise<VkLongPollCursor | undefined> => longPollCursor;
+  const saveCursor = async (cursor: VkLongPollCursor): Promise<void> => {
+    longPollCursor = cursor;
+  };
+  const onCursorReset = async (): Promise<void> => {
+    longPollCursor = undefined;
+  };
 
 
   // Ensure gateway stop triggers VK polling shutdown.
@@ -618,10 +585,11 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     opts.setStatus?.({ lastEventAt: Date.now() });
 
     try {
-      await durableIngress.enqueue({
-        version: 1,
-        kind: "message",
+      await handleVkInbound({
         message,
+        account,
+        config: readVkRuntimeConfig(core),
+        runtime: opts.runtime,
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -655,10 +623,11 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       opts.runtime.log?.(
         `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.postId}`,
       );
-      await durableIngress.enqueue({
-        version: 1,
-        kind: "message",
+      await handleVkInbound({
         message,
+        account,
+        config: readVkRuntimeConfig(core),
+        runtime: opts.runtime,
       });
     } catch (err) {
       opts.runtime.error?.(`vk: wall_reply_new handler error: ${String(err)}`);
@@ -690,10 +659,11 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       opts.runtime.log?.(
         `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.videoId}`,
       );
-      await durableIngress.enqueue({
-        version: 1,
-        kind: "message",
+      await handleVkInbound({
         message,
+        account,
+        config: readVkRuntimeConfig(core),
+        runtime: opts.runtime,
       });
     } catch (err) {
       opts.runtime.error?.(`vk: video_comment_new handler error: ${String(err)}`);
@@ -722,7 +692,6 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
   });
 
   try {
-    durableIngress.start();
     // Detect whether Bots LP is available; fall back to User LP otherwise
     const botsLp = await canUseBotsLongPoll(vk);
     if (stopRequested || opts.abortSignal?.aborted) {
@@ -772,20 +741,17 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
             opts.setStatus?.({ lastTransportActivityAt: Date.now() });
           }
         },
-        loadCursor: async () => {
-          return await cursorStore.lookup(cursorKey);
-        },
-        saveCursor: async (cursor) => {
-          await cursorStore.register(cursorKey, cursor);
-        },
+        loadCursor,
+        saveCursor,
         onCursorReset: async () => {
           const recovered = await recoverVkUnreadHistory({
             account,
             enqueue: async (message) => {
-              await durableIngress.enqueue({
-                version: 1,
-                kind: "message",
+              await handleVkInbound({
                 message,
+                account,
+                config: readVkRuntimeConfig(core),
+                runtime: opts.runtime,
               });
             },
             onError: (error) => {
@@ -803,36 +769,6 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
         onUpdate: async (update) => {
           const eventType = typeof update.type === "string" ? update.type : "unknown";
           opts.runtime.log?.(`[${opts.accountId}] VK Long Poll update: ${eventType}`);
-
-          // Bots Long Poll already gives us the exact VK webhook payload.
-          // Handle comment events from update.object directly instead of
-          // rebuilding a CommentContext: vk-io's webhook context stores the
-          // raw payload behind a protected field, while our comment resolver
-          // intentionally works with the raw VK object.
-          if (eventType === "wall_reply_new") {
-            if (!update.object || typeof update.object !== "object" || Array.isArray(update.object)) {
-              opts.runtime.log?.(`[${opts.accountId}] VK wall_reply_new ignored: invalid raw payload`);
-              return;
-            }
-            await durableIngress.enqueue({
-              version: 1,
-              kind: "wall_reply_new",
-              object: update.object as Record<string, unknown>,
-            });
-            return;
-          }
-          if (eventType === "video_comment_new") {
-            if (!update.object || typeof update.object !== "object" || Array.isArray(update.object)) {
-              opts.runtime.log?.(`[${opts.accountId}] VK video_comment_new ignored: invalid raw payload`);
-              return;
-            }
-            await durableIngress.enqueue({
-              version: 1,
-              kind: "video_comment_new",
-              object: update.object as Record<string, unknown>,
-            });
-            return;
-          }
           await vk.updates.handleWebhookUpdate(update);
         },
       });
@@ -894,7 +830,6 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
   } finally {
     try {
       await stopUpdates();
-      await durableIngress.stop();
     } finally {
       // Unconditional: a failed start never armed the watchdog, so nothing else
       // would ever stop it, and each retry would leave another interval behind.
