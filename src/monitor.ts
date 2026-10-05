@@ -586,17 +586,10 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
     opts.setStatus?.({ lastEventAt: Date.now() });
 
     try {
-      const currentCfg = readVkRuntimeConfig(core);
-      const currentAccount = resolveVkAccount({
-        cfg: currentCfg,
-        accountId: account.accountId,
-      });
-
-      await handleVkInbound({
+      await durableIngress.enqueue({
+        version: 1,
+        kind: "message",
         message,
-        account: currentAccount,
-        config: currentCfg,
-        runtime: opts.runtime,
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -629,9 +622,11 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       opts.runtime.log?.(
         `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.postId}`,
       );
-      const currentCfg = readVkRuntimeConfig(core);
-      const currentAccount = resolveVkAccount({ cfg: currentCfg, accountId: account.accountId });
-      await handleVkInbound({ message, account: currentAccount, config: currentCfg, runtime: opts.runtime });
+      await durableIngress.enqueue({
+        version: 1,
+        kind: "wall_reply_new",
+        object: context as unknown as Record<string, unknown>,
+      });
     } catch (err) {
       opts.runtime.error?.(`vk: wall_reply_new handler error: ${String(err)}`);
     }
@@ -661,9 +656,11 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       opts.runtime.log?.(
         `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.videoId}`,
       );
-      const currentCfg = readVkRuntimeConfig(core);
-      const currentAccount = resolveVkAccount({ cfg: currentCfg, accountId: account.accountId });
-      await handleVkInbound({ message, account: currentAccount, config: currentCfg, runtime: opts.runtime });
+      await durableIngress.enqueue({
+        version: 1,
+        kind: "video_comment_new",
+        object: context as unknown as Record<string, unknown>,
+      });
     } catch (err) {
       opts.runtime.error?.(`vk: video_comment_new handler error: ${String(err)}`);
     }
