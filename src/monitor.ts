@@ -782,6 +782,83 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
         onUpdate: async (update) => {
           const eventType = typeof update.type === "string" ? update.type : "unknown";
           opts.runtime.log?.(`[${opts.accountId}] VK Long Poll update: ${eventType}`);
+
+          // Bots Long Poll already gives us the exact raw VK payload.
+          // Do not pass comment events through vk-io's webhook adapter:
+          // its CommentContext does not expose the raw VK comment fields
+          // used by resolveVkWallComment/resolveVkVideoComment.
+          if (eventType === "wall_reply_new") {
+            try {
+              const comment = await resolveVkWallComment(vk, update.object);
+              if (!comment) {
+                opts.runtime.log?.(`[${opts.accountId}] VK wall_reply_new ignored: invalid raw payload`);
+                return;
+              }
+              const kind = comment.eventType === "clip_comment" ? "clip" : "post";
+              if (!isVkCommentEnabled(account.config, kind)) return;
+              const ownGroup = await resolveVkOwnGroup(opts.token);
+              if (ownGroup && comment.senderId === -ownGroup.id) return;
+              const message = commentMessageFromContext(comment);
+              if (!message) return;
+
+              opts.setStatus?.({ lastEventAt: Date.now() });
+              core.channel.activity.record({
+                channel: "vk-openclaw-channel",
+                accountId: account.accountId,
+                direction: "inbound",
+                at: message.timestamp,
+              });
+              opts.runtime.log?.(
+                `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.postId}`,
+              );
+              await handleVkInbound({
+                message,
+                account,
+                config: readVkRuntimeConfig(core),
+                runtime: opts.runtime,
+              });
+            } catch (err) {
+              opts.runtime.error?.(`vk: wall_reply_new handler error: ${String(err)}`);
+            }
+            return;
+          }
+
+          if (eventType === "video_comment_new") {
+            try {
+              const comment = await resolveVkVideoComment(vk, update.object);
+              if (!comment) {
+                opts.runtime.log?.(`[${opts.accountId}] VK video_comment_new ignored: invalid raw payload`);
+                return;
+              }
+              const kind = comment.eventType === "clip_comment" ? "clip" : "video";
+              if (!isVkCommentEnabled(account.config, kind)) return;
+              const ownGroup = await resolveVkOwnGroup(opts.token);
+              if (ownGroup && comment.senderId === -ownGroup.id) return;
+              const message = commentMessageFromContext(comment);
+              if (!message) return;
+
+              opts.setStatus?.({ lastEventAt: Date.now() });
+              core.channel.activity.record({
+                channel: "vk-openclaw-channel",
+                accountId: account.accountId,
+                direction: "inbound",
+                at: message.timestamp,
+              });
+              opts.runtime.log?.(
+                `[${opts.accountId}] VK ${comment.eventType}: comment=${comment.commentId} content=${comment.ownerId}_${comment.videoId}`,
+              );
+              await handleVkInbound({
+                message,
+                account,
+                config: readVkRuntimeConfig(core),
+                runtime: opts.runtime,
+              });
+            } catch (err) {
+              opts.runtime.error?.(`vk: video_comment_new handler error: ${String(err)}`);
+            }
+            return;
+          }
+
           await vk.updates.handleWebhookUpdate(update);
         },
       });
