@@ -482,6 +482,11 @@ export async function handleVkInbound(params: {
     account,
     message,
     sessionExists: previousTimestamp !== undefined,
+    onError: (error) => {
+      runtime.log?.(
+        `VK history import skipped for sender=${redactVkId(message.senderId)}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
   });
   if (importedHistory) {
     agentBody = importedHistory + "\n\n" + agentBody;
