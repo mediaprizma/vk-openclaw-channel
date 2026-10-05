@@ -34,6 +34,47 @@ let loaded = false;
 let loadPromise: Promise<void> | undefined;
 let writePromise: Promise<void> = Promise.resolve();
 
+
+type PendingMasterQuestion = {
+  accountId: string;
+  target: string;
+  agentId: string;
+  sessionKey: string;
+  clientPeerId: number;
+  clientTarget: string;
+  queuedAt: number;
+};
+
+const pendingMasterQuestions: PendingMasterQuestion[] = [];
+
+export function queueVkMasterQuestion(params: PendingMasterQuestion): void {
+  if (!params.sessionKey || !params.target || !Number.isSafeInteger(params.clientPeerId) || params.clientPeerId <= 0) return;
+  pendingMasterQuestions.push(params);
+  const cutoff = Date.now() - 60_000;
+  while (pendingMasterQuestions.length > 0 && pendingMasterQuestions[0]!.queuedAt < cutoff) {
+    pendingMasterQuestions.shift();
+  }
+}
+
+export function takeVkPendingMasterQuestion(params: {
+  accountId: string;
+  target: string;
+}): PendingMasterQuestion | undefined {
+  const cutoff = Date.now() - 60_000;
+  for (let i = pendingMasterQuestions.length - 1; i >= 0; i--) {
+    const item = pendingMasterQuestions[i]!;
+    if (item.queuedAt < cutoff) {
+      pendingMasterQuestions.splice(i, 1);
+      continue;
+    }
+    if (item.accountId === params.accountId && item.target === params.target) {
+      pendingMasterQuestions.splice(i, 1);
+      return item;
+    }
+  }
+  return undefined;
+}
+
 function stateFilePath(): string {
   const stateDir = process.env.OPENCLAW_STATE_DIR?.trim() || join(homedir(), ".openclaw");
   return join(stateDir, "state", "vk-openclaw-channel", "master-routing.json");
@@ -138,6 +179,7 @@ export async function consumeVkMasterQuestion(messageId: string): Promise<VkMast
 export function clearVkMasterRoutingForTest(): void {
   clients.clear();
   questions.clear();
+  pendingMasterQuestions.length = 0;
   loaded = true;
   loadPromise = undefined;
   writePromise = Promise.resolve();
