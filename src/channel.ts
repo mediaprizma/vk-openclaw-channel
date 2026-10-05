@@ -245,6 +245,46 @@ function logVkOutbound(
   vkDiag("outbound sent", { stage, to, ...fields });
 }
 
+async function bindVkMasterQuestionAfterSend(params: {
+  cfg: OpenClawConfig;
+  accountId?: string | null;
+  to: string;
+  results: Array<{ messageId?: string | null }>;
+}): Promise<void> {
+  const accountId = params.accountId ?? DEFAULT_ACCOUNT_ID;
+  const resolvedAccount = resolveVkAccount({ cfg: params.cfg as CoreConfig, accountId });
+  const masterVkId = Number(String(resolvedAccount.config.masterVkId ?? "").trim());
+  const normalizedTo = String(params.to).trim().replace(/^vk:(?:user:|chat:)?/i, "");
+  if (!Number.isSafeInteger(masterVkId) || masterVkId <= 0 || normalizedTo !== String(masterVkId)) {
+    return;
+  }
+  const pending = takeVkPendingMasterQuestion({ accountId, target: String(masterVkId) });
+  if (!pending) {
+    vkDiag("master question binding missing", { accountId, to: normalizedTo });
+    return;
+  }
+  for (const result of params.results) {
+    const messageId = String(result.messageId ?? "").trim();
+    if (!messageId) continue;
+    await rememberVkMasterQuestion({
+      messageId,
+      accountId: pending.accountId,
+      sessionKey: pending.sessionKey,
+      agentId: pending.agentId,
+      clientPeerId: pending.clientPeerId,
+      clientTarget: pending.clientTarget,
+      createdAt: Date.now(),
+    });
+  }
+  vkDiag("master question bound", {
+    accountId,
+    masterVkId,
+    sessionKey: pending.sessionKey,
+    clientPeerId: pending.clientPeerId,
+    messageIds: params.results.map((r) => r.messageId).filter(Boolean),
+  });
+}
+
 export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
   id: "vk-openclaw-channel",
   meta: {
@@ -456,22 +496,12 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         replyTo: replyToId ?? undefined,
         forceDocument: forceDocument ?? undefined,
       });
-      const resolvedAccount = resolveVkAccount({ cfg: cfg as CoreConfig, accountId: accountId ?? undefined });
-      const masterVkId = Number(String(resolvedAccount.config.masterVkId ?? "").trim());
-      if (result && Number.isSafeInteger(masterVkId) && masterVkId > 0 && String(to).replace(/^vk:/i, "") === String(masterVkId)) {
-        const pending = takeVkPendingMasterQuestion({ accountId: accountId ?? DEFAULT_ACCOUNT_ID, target: String(masterVkId) });
-        if (pending) {
-          await rememberVkMasterQuestion({
-            messageId: result.messageId,
-            accountId: pending.accountId,
-            sessionKey: pending.sessionKey,
-            agentId: pending.agentId,
-            clientPeerId: pending.clientPeerId,
-            clientTarget: pending.clientTarget,
-            createdAt: Date.now(),
-          });
-        }
-      }
+      await bindVkMasterQuestionAfterSend({
+        cfg,
+        accountId,
+        to,
+        results: result ? [result] : [],
+      });
       logVkOutbound("sendPayload", to, {
         textLen: payload.text?.length ?? 0,
         media: Boolean(payload.mediaUrl || payload.mediaUrls?.length),
@@ -487,6 +517,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         accountId: accountId ?? undefined,
         replyTo: replyToId ?? undefined,
       });
+      await bindVkMasterQuestionAfterSend({ cfg, accountId, to, results });
       logVkOutbound("sendFormattedText", to, {
         textLen: text.length,
         media: false,
@@ -512,6 +543,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         accountId: accountId ?? undefined,
         replyTo: replyToId ?? undefined,
       });
+      await bindVkMasterQuestionAfterSend({ cfg, accountId, to, results: [result] });
       logVkOutbound("sendText", to, { textLen: text.length, media: false, messageId: result.messageId });
       return { channel: "vk-openclaw-channel", ...result };
     },
@@ -526,6 +558,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
           accountId: accountId ?? undefined,
           replyTo: replyToId ?? undefined,
         });
+        await bindVkMasterQuestionAfterSend({ cfg, accountId, to, results: [textOnly] });
         logVkOutbound("sendMedia", to, { textLen: text?.length ?? 0, media: false, messageId: textOnly.messageId });
         return { channel: "vk-openclaw-channel", ...textOnly };
       }
@@ -537,6 +570,7 @@ export const vkPlugin: ChannelPlugin<ResolvedVkAccount, VkProbe> = {
         replyTo: replyToId ?? undefined,
         forceDocument: forceDocument ?? undefined,
       });
+      await bindVkMasterQuestionAfterSend({ cfg, accountId, to, results: [result] });
       logVkOutbound("sendMedia", to, { textLen: text?.length ?? 0, media: true, messageId: result.messageId });
       return { channel: "vk-openclaw-channel", ...result };
     },
