@@ -206,7 +206,7 @@ export async function handleVkInbound(params: {
   const isOperatorMessage =
     !isComment &&
     isConfiguredMaster &&
-    message.adminAuthorId === configuredMasterVkId;
+    (message.adminAuthorId === configuredMasterVkId || message.senderId === configuredMasterVkId);
 
   const masterQuestion =
     isOperatorMessage && message.replyToMessageId
@@ -517,7 +517,7 @@ export async function handleVkInbound(params: {
     : resolvedRoute;
 
   const fromLabel = isOperatorMessage
-    ? "vk:master:" + message.adminAuthorId
+    ? "vk:master:" + (message.adminAuthorId ?? message.senderId)
     : message.comment
       ? `vk:comment:${message.comment.eventType}:${message.senderId}`
       : isGroup
