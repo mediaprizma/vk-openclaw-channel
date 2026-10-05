@@ -327,9 +327,34 @@ export async function handleVkInbound(params: {
         ].join("\n")
       : undefined;
 
+  // Keep the original VK media URL visible in the agent/UI context as a
+  // clickable fallback. The structured media fact is still passed separately
+  // to OpenClaw for native vision/media handling, but the Control UI may show
+  // only "[Image attachment could not be analyzed]" when the active vision
+  // path cannot consume the staged file. The URL lets the master open the
+  // exact original VK attachment and also gives the agent something concrete
+  // to pass through when asking the master to inspect a photo.
+  const inboundMediaLinks = Array.from(
+    new Set(
+      (message.attachments ?? [])
+        .filter((attachment) => attachment.kind === "image" && attachment.url?.trim())
+        .map((attachment) => attachment.url!.trim()),
+    ),
+  );
+  const mediaLinkContext =
+    inboundMediaLinks.length > 0
+      ? [
+          "Фото клиента:",
+          ...inboundMediaLinks.map((url, index) => `[Открыть фото ${index + 1}](${url})`),
+        ].join("\n")
+      : undefined;
+
   let agentBody = inboundSurfaceContext
     ? inboundSurfaceContext + "\n\n" + rawBody
     : rawBody;
+  if (mediaLinkContext) {
+    agentBody += "\n\n" + mediaLinkContext;
+  }
 
   if (isOperatorMessage && masterQuestion) {
     agentBody = [
