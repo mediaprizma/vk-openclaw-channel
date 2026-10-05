@@ -1144,7 +1144,7 @@ export async function handleVkInbound(params: {
                 let edited = false;
                 try {
                   edited = await editMessageVk(
-                    String(message.peerId),
+                    String(deliveryPeerId),
                     draftMsgId,
                     chunks[0].text,
                     account,
@@ -1184,7 +1184,7 @@ export async function handleVkInbound(params: {
                     if (markdownAttachments.attachments.length > 0) {
                       await deliverVkReply({
                         payload: { text: markdownAttachments.attachments.join("\n") },
-                        peerId: message.peerId,
+                        peerId: deliveryPeerId,
                         accountId: account.accountId,
                         statusSink,
                       });
@@ -1201,7 +1201,7 @@ export async function handleVkInbound(params: {
                       for (const media of mediaList) {
                         await deliverVkReply({
                           payload: { ...normalized, text: "", mediaUrl: media, mediaUrls: undefined },
-                          peerId: message.peerId,
+                          peerId: deliveryPeerId,
                           accountId: account.accountId,
                           statusSink,
                         });
@@ -1235,7 +1235,7 @@ export async function handleVkInbound(params: {
           if (!keepsDraftAnswer || leftToSend) {
             const delivered = await deliverVkReply({
               payload: outboundPayload,
-              peerId: message.peerId,
+              peerId: deliveryPeerId,
               accountId: account.accountId,
               statusSink,
               clearKeyboard:
